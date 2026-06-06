@@ -274,6 +274,7 @@ function parseKhoRows(rows) {
   return rows
     .map((row) => splitKhoCell(row[0]))
     .filter(Boolean)
+    .map(normalizeKhoParts)
     .map((parts, index) => ({
       stt: index + 1,
       projectCode: parts[0],
@@ -296,6 +297,24 @@ function splitKhoCell(value) {
   if (parts.length < 4) return null;
   while (parts.length < 7) parts.push('');
   return parts;
+}
+
+function normalizeKhoParts(parts) {
+  const normalized = [...parts];
+  const quantityCell = normalized[2];
+  const manufacturerCell = normalized[3];
+
+  if (!isQuantityCell(quantityCell) && isQuantityCell(manufacturerCell)) {
+    normalized[2] = manufacturerCell;
+    normalized[3] = quantityCell;
+  }
+
+  return normalized;
+}
+
+function isQuantityCell(value) {
+  const text = cleanCell(value).replace(',', '.');
+  return /^-?\d+(\.\d+)?$/.test(text);
 }
 
 function parseBomRows(rows) {
