@@ -1,12 +1,12 @@
 # Inventory Compare App
 
-Phần mềm Electron dùng để load **Dữ Liệu Kho** và **Dữ Liệu Thiết Kế** từ Excel, tự động so sánh mã bản vẽ và số lượng/máy, sau đó xuất báo cáo Excel.
+Phần mềm Electron dùng để load **Dữ Liệu Kho** và **Dữ Liệu Thiết Kế** từ Excel, tự động so sánh mã bản vẽ và số lượng/máy, sau đó xuất Excel theo bảng đang xem.
 
 ## Tính năng chính
 
 - Chọn một hoặc nhiều file **Dữ Liệu Kho** trong cùng một lần load.
 - Chọn một hoặc nhiều file **Dữ Liệu Thiết Kế** trong cùng một lần load.
-- Nếu file Excel có nhiều sheet, app cho chọn sheet cần load trước khi so sánh.
+- Nếu file Excel có nhiều sheet, app cho chọn một hoặc nhiều sheet cần load trước khi so sánh.
 - Có thể load thêm nhiều lần; dữ liệu được cộng dồn.
 - Tách dữ liệu kho từ cột A theo dấu `,`.
 - Tự chuẩn hóa các dòng kho bị đảo vị trí `nhà sản xuất, số lượng` thành `số lượng, nhà sản xuất`.
@@ -16,7 +16,6 @@ Phần mềm Electron dùng để load **Dữ Liệu Kho** và **Dữ Liệu Thi
 - Fuzzy matching để đề xuất mã bản vẽ gần giống.
 - Gộp phần xác nhận mã vào đầu bảng `So Sánh`.
 - Xuất riêng Excel cho bảng `So Sánh` hoặc `Thiếu Thừa`.
-- Xuất báo cáo Excel đầy đủ gồm dữ liệu kho, dữ liệu thiết kế, so sánh, thiếu thừa và mã cần xác nhận.
 - Lưu đường dẫn file đã load gần nhất vào file temp để tự khôi phục khi mở lại app.
 - Có nút `Update` để kiểm tra và tải phiên bản mới từ GitHub Releases.
 
@@ -49,8 +48,8 @@ npm run build:win
 
 File sau khi build nằm trong thư mục `release`:
 
-- `Inventory-Compare-Setup-2.1.0-x64.exe`: bản cài đặt.
-- `Inventory-Compare-Portable-2.1.0-x64.exe`: bản portable.
+- `Inventory-Compare-Setup-2.2.0-x64.exe`: bản cài đặt.
+- `Inventory-Compare-Portable-2.2.0-x64.exe`: bản portable.
 - `win-unpacked/Inventory Compare.exe`: bản unpacked để chạy thử nhanh.
 
 ## Hướng dẫn sử dụng
@@ -59,7 +58,7 @@ File sau khi build nằm trong thư mục `release`:
 
 1. Bấm `Dữ Liệu Kho`.
 2. Chọn một hoặc nhiều file Excel kho.
-3. Nếu file có nhiều sheet, chọn sheet cần dùng trong hộp `Chọn sheet để load`.
+3. Nếu file có nhiều sheet, chọn một hoặc nhiều sheet cần dùng trong hộp `Chọn sheet để load`.
 4. Sau khi load file đầu tiên, nút đổi thành `Thêm Dữ Liệu Kho`.
 5. Nếu chọn nhiều file, app sẽ đọc tất cả sheet đã chọn và cộng dồn vào bảng kho.
 
@@ -90,7 +89,7 @@ App sẽ tự hiểu `Số lượng/máy = 1` và `Nhà sản xuất = FBT`.
 
 1. Bấm `Dữ Liệu Thiết Kế`.
 2. Chọn một hoặc nhiều file Excel BOM/thiết kế.
-3. Nếu file có nhiều sheet, chọn sheet cần dùng trong hộp `Chọn sheet để load`.
+3. Nếu file có nhiều sheet, chọn một hoặc nhiều sheet cần dùng trong hộp `Chọn sheet để load`.
 4. Dữ liệu được cộng dồn vào bảng thiết kế.
 
 Các cột được đọc:
@@ -131,8 +130,6 @@ Nút `Xuất Excel` hoạt động theo bảng đang xem:
 
 - Đang xem `So Sánh`: xuất file Excel bảng so sánh.
 - Đang xem `Thiếu Thừa`: xuất file Excel bảng thiếu thừa.
-
-Nút `Xuất báo cáo` xuất workbook đầy đủ gồm nhiều sheet.
 
 ### 6. Clear dữ liệu
 

@@ -9,14 +9,12 @@
 <body>
   <header class="app-header">
     <div>
-      <h1>Kiểm Soát Số Lượng Hàng Thừa Thiếu</h1>
-      <p>Load dữ liệu kho, dữ liệu thiết kế, tự động so sánh và xuất báo cáo Excel.</p>
+      <h1>Kiểm Soát Số Lượng Hàng Thừa Thiếu <span id="appVersion" class="app-version"></span></h1>
+      <p>Load dữ liệu kho, dữ liệu thiết kế, tự động so sánh và xuất Excel theo bảng đang xem.</p>
     </div>
     <div class="header-actions">
       <input id="searchInput" type="search" placeholder="Tìm mã bản vẽ, tên mặt hàng...">
-      <button id="updateBtn" class="button">Update</button>
-      <button id="exportExcelBtn" class="button" disabled>Xuất Excel</button>
-      <button id="exportBtn" class="button button-primary" disabled>Xuất báo cáo</button>
+      <button id="exportExcelBtn" class="button button-primary" disabled>Xuất Excel</button>
     </div>
   </header>
 
@@ -50,7 +48,10 @@
             <strong id="sideBomCount">0</strong>
           </div>
         </div>
-        <p>Bảng bên phải dùng để xem dữ liệu, xác nhận mã và xuất Excel.</p>
+        <div class="preview-actions">
+          <button id="updateBtn" class="button button-primary">Update</button>
+          <button id="infoBtn" class="button">Thông tin</button>
+        </div>
       </section>
 
       <div class="theme-dots" aria-label="Chọn theme">

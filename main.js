@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const XLSX = require('xlsx');
@@ -20,9 +20,21 @@ function createWindow() {
     }
   });
 
+  if (app.isPackaged) {
+    win.setMenu(null);
+    win.setMenuBarVisibility(false);
+  }
+
   mainWindow = win;
   win.loadFile('index.html');
 }
+
+ipcMain.handle('app:version', async () => app.getVersion());
+
+ipcMain.handle('app:openGithub', async () => {
+  await shell.openExternal('https://github.com/pokemon1742000-commits/Assem_CompareDataBOM');
+  return true;
+});
 
 ipcMain.handle('excel:open', async () => {
   const result = await dialog.showOpenDialog({

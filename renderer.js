@@ -76,6 +76,7 @@ const els = {};
 document.addEventListener('DOMContentLoaded', () => {
   bindElements();
   bindEvents();
+  renderAppVersion();
   renderAll();
   restoreRecentFiles();
 });
@@ -86,11 +87,12 @@ function bindElements() {
     'loadBomBtn',
     'clearBtn',
     'updateBtn',
+    'infoBtn',
     'exportExcelBtn',
-    'exportBtn',
     'searchInput',
     'autoThreshold',
     'confirmThreshold',
+    'appVersion',
     'khoCount',
     'bomCount',
     'sideKhoCount',
@@ -121,8 +123,8 @@ function bindEvents() {
   els.loadBomBtn.addEventListener('click', loadBomFile);
   els.clearBtn.addEventListener('click', clearData);
   els.updateBtn.addEventListener('click', checkForUpdates);
+  els.infoBtn.addEventListener('click', openGithubInfo);
   els.exportExcelBtn.addEventListener('click', exportCurrentTable);
-  els.exportBtn.addEventListener('click', exportReport);
   window.inventoryApi.onUpdateStatus((message) => showToast(message));
   document.querySelectorAll('.theme-dot').forEach((button) => {
     button.addEventListener('click', () => {
@@ -147,6 +149,15 @@ function applyTheme(themeName) {
   document.querySelectorAll('.theme-dot').forEach((button) => {
     button.classList.toggle('active', button.dataset.theme === themeName);
   });
+}
+
+async function renderAppVersion() {
+  try {
+    const version = await window.inventoryApi.getAppVersion();
+    els.appVersion.textContent = version ? `v${version}` : '';
+  } catch {
+    els.appVersion.textContent = '';
+  }
 }
 
 async function loadKhoFile() {
@@ -209,6 +220,35 @@ async function checkForUpdates() {
   }
 }
 
+async function openGithubInfo() {
+  const overlay = document.createElement('div');
+  overlay.className = 'sheet-modal-overlay';
+  overlay.innerHTML = `
+    <div class="info-modal">
+      <header>
+        <h2>Thông tin GitHub</h2>
+        <p>Trang GitHub dùng để phát hành phiên bản mới và kiểm tra update.</p>
+      </header>
+      <div class="info-content">
+        <button class="github-link" data-action="open-github">https://github.com/pokemon1742000-commits/Assem_CompareDataBOM</button>
+      </div>
+      <footer>
+        <button class="button" data-action="close">Đóng</button>
+      </footer>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  overlay.querySelector('[data-action="close"]').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('[data-action="open-github"]').addEventListener('click', async () => {
+    try {
+      await window.inventoryApi.openGithub();
+    } catch (error) {
+      showToast(`Không thể mở GitHub: ${error.message}`);
+    }
+  });
+}
+
 async function loadSelectedExcelFiles() {
   const fileInfos = normalizeLoadedFiles(await window.inventoryApi.openExcel());
   if (!fileInfos.length) return [];
@@ -236,12 +276,17 @@ function showSheetPicker(fileInfos) {
     const overlay = document.createElement('div');
     overlay.className = 'sheet-modal-overlay';
     const rows = fileInfos.map((file, index) => {
-      const options = (file.sheets || []).map((sheet) => `<option value="${escapeHtml(sheet)}">${escapeHtml(sheet)}</option>`).join('');
-      return `
-        <label class="sheet-picker-row">
-          <span>${escapeHtml(file.fileName)}</span>
-          <select data-index="${index}">${options}</select>
+      const options = (file.sheets || []).map((sheet, sheetIndex) => `
+        <label class="sheet-option">
+          <input type="checkbox" data-file-index="${index}" value="${escapeHtml(sheet)}"${sheetIndex === 0 ? ' checked' : ''}>
+          <span>${escapeHtml(sheet)}</span>
         </label>
+      `).join('');
+      return `
+        <div class="sheet-picker-row">
+          <div class="sheet-file-name">${escapeHtml(file.fileName)}</div>
+          <div class="sheet-options">${options}</div>
+        </div>
       `;
     }).join('');
 
@@ -267,13 +312,19 @@ function showSheetPicker(fileInfos) {
     });
 
     overlay.querySelector('[data-action="confirm"]').addEventListener('click', () => {
-      const selections = fileInfos.map((file, index) => {
-        const select = overlay.querySelector(`select[data-index="${index}"]`);
-        return {
+      const selections = fileInfos.flatMap((file, index) => {
+        const checkedSheets = Array.from(overlay.querySelectorAll(`input[data-file-index="${index}"]:checked`));
+        return checkedSheets.map((input) => ({
           filePath: file.filePath,
-          sheetName: select ? select.value : (file.sheets || [])[0] || ''
-        };
+          sheetName: input.value
+        }));
       });
+
+      if (!selections.length) {
+        showToast('Hãy chọn ít nhất một sheet để load.');
+        return;
+      }
+
       overlay.remove();
       resolve(selections);
     });
@@ -755,23 +806,6 @@ function rejectConfirm(index) {
   runCompare();
 }
 
-async function exportReport() {
-  try {
-    const filePath = await window.inventoryApi.exportExcel({
-      khoRows: state.khoRows,
-      bomRows: state.bomRows,
-      compareRows: state.compareRows,
-      discrepancyRows: state.discrepancyRows,
-      confirmRows: state.confirmRows
-    });
-    if (filePath) {
-      showToast(`Đã xuất báo cáo: ${filePath}`);
-    }
-  } catch (error) {
-    showToast(`Không thể xuất báo cáo: ${error.message}`);
-  }
-}
-
 async function exportCurrentTable() {
   try {
     if (state.view === 'compare') {
@@ -824,7 +858,6 @@ function renderAll() {
   els.loadKhoBtn.textContent = state.khoRows.length ? 'Thêm Dữ Liệu Kho' : 'Dữ Liệu Kho';
   els.loadBomBtn.textContent = state.bomRows.length ? 'Thêm Dữ Liệu Thiết Kế' : 'Dữ Liệu Thiết Kế';
   els.exportExcelBtn.disabled = !canExportCurrentTable();
-  els.exportBtn.disabled = state.compareRows.length === 0 && state.discrepancyRows.length === 0 && state.confirmRows.length === 0;
 
   const okCount = state.compareRows.filter((row) => row.status === 'Đủ').length;
   const missingCount = state.discrepancyRows.filter((row) => row.status === 'Thiếu').length;
