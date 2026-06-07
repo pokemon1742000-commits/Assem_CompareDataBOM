@@ -79,7 +79,6 @@ document.addEventListener('DOMContentLoaded', () => {
   bindElements();
   bindEvents();
   renderAppVersion();
-  startLicenseTimer();
   renderAll();
   restoreRecentFiles();
 });
@@ -134,7 +133,10 @@ function bindEvents() {
   els.clearBtn.addEventListener('click', clearData);
   els.updateBtn.addEventListener('click', checkForUpdates);
   els.infoBtn.addEventListener('click', openGithubInfo);
-  els.licenseBtn.addEventListener('click', showLicenseDialog);
+  if (els.licenseBtn) {
+    els.licenseBtn.hidden = true;
+    els.licenseBtn.addEventListener('click', showLicenseDialog);
+  }
   els.expiredLicenseBtn.addEventListener('click', activateExpiredLicense);
   els.quitAppBtn.addEventListener('click', () => window.inventoryApi.quitApp());
   els.exportExcelBtn.addEventListener('click', exportCurrentTable);
@@ -186,6 +188,7 @@ function renderLicenseStatus() {
     els.appVersion.textContent = `v${status.appVersion || state.appVersion}`;
     els.trialStatus.textContent = '';
     els.licenseOverlay.hidden = true;
+    if (els.licenseBtn) els.licenseBtn.hidden = true;
     return;
   }
 

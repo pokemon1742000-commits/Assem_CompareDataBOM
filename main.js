@@ -408,59 +408,18 @@ function writeLicenseState(state) {
 }
 
 function getLicenseStatus() {
-  const state = readLicenseState();
-  const installedAt = new Date(state.installedAt);
-  const trialEndsAt = new Date(installedAt.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
-  const now = new Date();
-  const remainingMs = Math.max(0, trialEndsAt.getTime() - now.getTime());
-
   return {
     appVersion: app.getVersion(),
-    licensed: Boolean(state.licensed),
+    licensed: true,
     trialDays: TRIAL_DAYS,
-    trialEndsAt: trialEndsAt.toISOString(),
-    remainingMs,
-    trialExpired: !state.licensed && remainingMs <= 0
+    trialEndsAt: '',
+    remainingMs: 0,
+    trialExpired: false
   };
 }
 
 function activateLicense(code) {
-  const normalizedCode = normalizeLicenseCode(code);
-  if (!isLicenseFormat(normalizedCode)) {
-    return { ok: false, message: 'Mã license không đúng định dạng XXX-XXX-XXX-XXXX.', status: getLicenseStatus() };
-  }
-
-  const licenseFile = findLicenseFile();
-  if (!licenseFile) {
-    return { ok: false, message: 'Không tìm thấy file licenses.json để xác thực license.', status: getLicenseStatus() };
-  }
-
-  const licenses = readLicensePool(licenseFile);
-  const licenseIndex = licenses.findIndex((license) => normalizeLicenseCode(license) === normalizedCode);
-  if (licenseIndex < 0) {
-    return { ok: false, message: 'License không hợp lệ hoặc đã được sử dụng.', status: getLicenseStatus() };
-  }
-
-  licenses.splice(licenseIndex, 1);
-  try {
-    writeLicensePool(licenseFile, licenses);
-  } catch (error) {
-    return {
-      ok: false,
-      message: `Không thể xóa license đã dùng khỏi file: ${error.message}`,
-      status: getLicenseStatus()
-    };
-  }
-
-  const state = readLicenseState();
-  writeLicenseState({
-    ...state,
-    licensed: true,
-    activatedAt: new Date().toISOString(),
-    licenseCode: normalizedCode
-  });
-
-  return { ok: true, message: 'Kích hoạt license thành công.', status: getLicenseStatus() };
+  return { ok: true, message: 'Phần mềm đang ở bản dùng vĩnh viễn.', status: getLicenseStatus() };
 }
 
 function findLicenseFile() {
