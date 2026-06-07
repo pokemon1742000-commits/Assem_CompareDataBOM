@@ -1,13 +1,14 @@
 {
   "name": "inventory-compare-app",
-  "version": "2.2.1",
+  "version": "2.5.0",
   "description": "Phan mem so sanh du lieu kho va du lieu thiet ke tu Excel",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "pack": "electron-builder --dir",
     "build": "electron-builder",
-    "build:win": "electron-builder --win"
+    "build:win": "electron-builder --win",
+    "license:create": "node scripts/create-license.js"
   },
   "keywords": [],
   "author": "",

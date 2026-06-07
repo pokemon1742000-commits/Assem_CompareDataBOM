@@ -48,8 +48,8 @@ npm run build:win
 
 File sau khi build nằm trong thư mục `release`:
 
-- `Inventory-Compare-Setup-2.2.1-x64.exe`: bản cài đặt.
-- `Inventory-Compare-Portable-2.2.1-x64.exe`: bản portable.
+- `Inventory-Compare-Setup-2.5.0-x64.exe`: bản cài đặt.
+- `Inventory-Compare-Portable-2.5.0-x64.exe`: bản portable.
 - `win-unpacked/Inventory Compare.exe`: bản unpacked để chạy thử nhanh.
 
 ## Hướng dẫn sử dụng
@@ -158,6 +158,36 @@ https://github.com/pokemon1742000-commits/Assem_CompareDataBOM
 4. Người dùng bấm `Update`; nếu có bản mới, app sẽ tải về và hỏi khởi động lại để cài.
 
 Lưu ý: nút `Update` chỉ hoạt động trên bản đã build `.exe`, không hoạt động khi chạy bằng `npm start`.
+
+## Trial và License
+
+- Khi chưa nhập license, phần mềm hiển thị `Trial` và cho dùng thử 7 ngày.
+- Bộ đếm thời gian trial nằm dưới nút `Update` và `Thông tin`.
+- Khi hết hạn trial, phần mềm sẽ khóa thao tác và chỉ cho nhập license hoặc tắt phần mềm.
+- Khi nhập đúng license, phần mềm chuyển sang bản vĩnh viễn và hiển thị version hiện tại, ví dụ `v2.5.0`.
+- License hợp lệ có dạng `XXX-XXX-XXX-XXXX`.
+
+Tạo file license:
+
+```bash
+npm run license:create -- 20
+```
+
+Lệnh trên tạo 20 mã trong file:
+
+```text
+licenses.json
+```
+
+Có thể chỉ định file đầu ra:
+
+```bash
+npm run license:create -- 50 D:\licenses.json
+```
+
+Khi app kích hoạt thành công, mã vừa dùng sẽ bị xóa khỏi `licenses.json`.
+
+Khi dùng bản `.exe`, đặt `licenses.json` cùng thư mục với file chạy hoặc trong thư mục dữ liệu app của người dùng. Nếu file nằm ở thư mục không cho ghi, app sẽ không thể xóa mã đã dùng.
 
 ## Cấu trúc file chính
 

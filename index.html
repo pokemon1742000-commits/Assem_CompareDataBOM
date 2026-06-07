@@ -51,7 +51,9 @@
         <div class="preview-actions">
           <button id="updateBtn" class="button button-primary">Update</button>
           <button id="infoBtn" class="button">Thông tin</button>
+          <button id="licenseBtn" class="button">License</button>
         </div>
+        <div id="trialStatus" class="trial-status"></div>
       </section>
 
       <div class="theme-dots" aria-label="Chọn theme">
@@ -151,6 +153,18 @@
   </div>
 
   <div id="toast" class="toast" hidden></div>
+  <div id="licenseOverlay" class="license-overlay" hidden>
+    <div class="license-panel">
+      <h2>Trial đã hết hạn</h2>
+      <p>Vui lòng nhập license hợp lệ để tiếp tục sử dụng phần mềm.</p>
+      <div class="license-form">
+        <input id="expiredLicenseInput" type="text" placeholder="XXX-XXX-XXX-XXXX" maxlength="16">
+        <button id="expiredLicenseBtn" class="button button-primary">Kích hoạt</button>
+        <button id="quitAppBtn" class="button">Tắt phần mềm</button>
+      </div>
+      <div id="expiredLicenseMessage" class="license-message"></div>
+    </div>
+  </div>
   <script src="./node_modules/fuse.js/dist/fuse.min.js"></script>
   <script src="./renderer.js"></script>
 </body>

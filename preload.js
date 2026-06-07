@@ -2,6 +2,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('inventoryApi', {
   getAppVersion: () => ipcRenderer.invoke('app:version'),
+  getLicenseStatus: () => ipcRenderer.invoke('app:licenseStatus'),
+  activateLicense: (code) => ipcRenderer.invoke('app:activateLicense', code),
+  quitApp: () => ipcRenderer.invoke('app:quit'),
   openGithub: () => ipcRenderer.invoke('app:openGithub'),
   openExcel: () => ipcRenderer.invoke('excel:open'),
   readExcelSheets: (selections) => ipcRenderer.invoke('excel:readSheets', selections),

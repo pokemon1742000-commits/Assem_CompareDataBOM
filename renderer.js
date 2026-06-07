@@ -1,6 +1,8 @@
 const state = {
   view: 'dashboard',
   search: '',
+  appVersion: '',
+  licenseStatus: null,
   khoFileName: '',
   bomFileName: '',
   khoPaths: [],
@@ -77,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindElements();
   bindEvents();
   renderAppVersion();
+  startLicenseTimer();
   renderAll();
   restoreRecentFiles();
 });
@@ -88,11 +91,18 @@ function bindElements() {
     'clearBtn',
     'updateBtn',
     'infoBtn',
+    'licenseBtn',
     'exportExcelBtn',
     'searchInput',
     'autoThreshold',
     'confirmThreshold',
     'appVersion',
+    'trialStatus',
+    'licenseOverlay',
+    'expiredLicenseInput',
+    'expiredLicenseBtn',
+    'quitAppBtn',
+    'expiredLicenseMessage',
     'khoCount',
     'bomCount',
     'sideKhoCount',
@@ -124,6 +134,9 @@ function bindEvents() {
   els.clearBtn.addEventListener('click', clearData);
   els.updateBtn.addEventListener('click', checkForUpdates);
   els.infoBtn.addEventListener('click', openGithubInfo);
+  els.licenseBtn.addEventListener('click', showLicenseDialog);
+  els.expiredLicenseBtn.addEventListener('click', activateExpiredLicense);
+  els.quitAppBtn.addEventListener('click', () => window.inventoryApi.quitApp());
   els.exportExcelBtn.addEventListener('click', exportCurrentTable);
   window.inventoryApi.onUpdateStatus((message) => showToast(message));
   document.querySelectorAll('.theme-dot').forEach((button) => {
@@ -153,11 +166,50 @@ function applyTheme(themeName) {
 
 async function renderAppVersion() {
   try {
-    const version = await window.inventoryApi.getAppVersion();
-    els.appVersion.textContent = version ? `v${version}` : '';
+    state.appVersion = await window.inventoryApi.getAppVersion();
+    await refreshLicenseStatus();
   } catch {
-    els.appVersion.textContent = '';
+    els.appVersion.textContent = 'Trial';
   }
+}
+
+async function refreshLicenseStatus() {
+  state.licenseStatus = await window.inventoryApi.getLicenseStatus();
+  renderLicenseStatus();
+}
+
+function renderLicenseStatus() {
+  const status = state.licenseStatus;
+  if (!status) return;
+
+  if (status.licensed) {
+    els.appVersion.textContent = `v${status.appVersion || state.appVersion}`;
+    els.trialStatus.textContent = '';
+    els.licenseOverlay.hidden = true;
+    return;
+  }
+
+  els.appVersion.textContent = 'Trial';
+  els.trialStatus.textContent = `Trial còn lại: ${formatRemainingTime(status.remainingMs)}`;
+  els.licenseOverlay.hidden = !status.trialExpired;
+}
+
+function startLicenseTimer() {
+  clearInterval(startLicenseTimer.timer);
+  startLicenseTimer.timer = setInterval(async () => {
+    if (!state.licenseStatus?.licensed) {
+      await refreshLicenseStatus();
+    }
+  }, 1000);
+}
+
+function formatRemainingTime(ms) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${days} ngày ${hours} giờ ${minutes} phút ${seconds} giây`;
 }
 
 async function loadKhoFile() {
@@ -247,6 +299,60 @@ async function openGithubInfo() {
       showToast(`Không thể mở GitHub: ${error.message}`);
     }
   });
+}
+
+function showLicenseDialog() {
+  const overlay = document.createElement('div');
+  overlay.className = 'sheet-modal-overlay';
+  overlay.innerHTML = `
+    <div class="info-modal">
+      <header>
+        <h2>Nhập License</h2>
+        <p>Nhập mã license dạng XXX-XXX-XXX-XXXX để kích hoạt bản vĩnh viễn.</p>
+      </header>
+      <div class="info-content">
+        <div class="license-form">
+          <input class="license-input" type="text" placeholder="XXX-XXX-XXX-XXXX" maxlength="16">
+          <button class="button button-primary" data-action="activate">Kích hoạt</button>
+        </div>
+        <div class="license-message"></div>
+      </div>
+      <footer>
+        <button class="button" data-action="close">Đóng</button>
+      </footer>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  const input = overlay.querySelector('.license-input');
+  const message = overlay.querySelector('.license-message');
+  input.focus();
+
+  overlay.querySelector('[data-action="close"]').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('[data-action="activate"]').addEventListener('click', async () => {
+    const result = await activateLicenseCode(input.value);
+    message.textContent = result.message;
+    message.classList.toggle('ok', result.ok);
+    if (result.ok) {
+      setTimeout(() => overlay.remove(), 800);
+    }
+  });
+}
+
+async function activateExpiredLicense() {
+  const result = await activateLicenseCode(els.expiredLicenseInput.value);
+  els.expiredLicenseMessage.textContent = result.message;
+  els.expiredLicenseMessage.classList.toggle('ok', result.ok);
+}
+
+async function activateLicenseCode(code) {
+  const result = await window.inventoryApi.activateLicense(code);
+  state.licenseStatus = result.status;
+  renderLicenseStatus();
+  if (result.ok) {
+    els.expiredLicenseInput.value = '';
+  }
+  return result;
 }
 
 async function loadSelectedExcelFiles() {

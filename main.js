@@ -6,6 +6,7 @@ const ExcelJS = require('exceljs');
 const { autoUpdater } = require('electron-updater');
 
 let mainWindow;
+const TRIAL_DAYS = 7;
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -33,6 +34,15 @@ ipcMain.handle('app:version', async () => app.getVersion());
 
 ipcMain.handle('app:openGithub', async () => {
   await shell.openExternal('https://github.com/pokemon1742000-commits/Assem_CompareDataBOM');
+  return true;
+});
+
+ipcMain.handle('app:licenseStatus', async () => getLicenseStatus());
+
+ipcMain.handle('app:activateLicense', async (_event, code) => activateLicense(code));
+
+ipcMain.handle('app:quit', async () => {
+  app.quit();
   return true;
 });
 
@@ -364,6 +374,127 @@ function getTimestamp() {
   const now = new Date();
   const pad = (value) => String(value).padStart(2, '0');
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+}
+
+function getLicenseStatePath() {
+  return path.join(app.getPath('userData'), 'license-state.json');
+}
+
+function readLicenseState() {
+  const defaultState = {
+    installedAt: new Date().toISOString(),
+    licensed: false,
+    activatedAt: '',
+    licenseCode: ''
+  };
+
+  try {
+    if (!fs.existsSync(getLicenseStatePath())) {
+      writeLicenseState(defaultState);
+      return defaultState;
+    }
+
+    const state = JSON.parse(fs.readFileSync(getLicenseStatePath(), 'utf8'));
+    return { ...defaultState, ...state };
+  } catch {
+    writeLicenseState(defaultState);
+    return defaultState;
+  }
+}
+
+function writeLicenseState(state) {
+  fs.mkdirSync(path.dirname(getLicenseStatePath()), { recursive: true });
+  fs.writeFileSync(getLicenseStatePath(), JSON.stringify(state, null, 2), 'utf8');
+}
+
+function getLicenseStatus() {
+  const state = readLicenseState();
+  const installedAt = new Date(state.installedAt);
+  const trialEndsAt = new Date(installedAt.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+  const now = new Date();
+  const remainingMs = Math.max(0, trialEndsAt.getTime() - now.getTime());
+
+  return {
+    appVersion: app.getVersion(),
+    licensed: Boolean(state.licensed),
+    trialDays: TRIAL_DAYS,
+    trialEndsAt: trialEndsAt.toISOString(),
+    remainingMs,
+    trialExpired: !state.licensed && remainingMs <= 0
+  };
+}
+
+function activateLicense(code) {
+  const normalizedCode = normalizeLicenseCode(code);
+  if (!isLicenseFormat(normalizedCode)) {
+    return { ok: false, message: 'Mã license không đúng định dạng XXX-XXX-XXX-XXXX.', status: getLicenseStatus() };
+  }
+
+  const licenseFile = findLicenseFile();
+  if (!licenseFile) {
+    return { ok: false, message: 'Không tìm thấy file licenses.json để xác thực license.', status: getLicenseStatus() };
+  }
+
+  const licenses = readLicensePool(licenseFile);
+  const licenseIndex = licenses.findIndex((license) => normalizeLicenseCode(license) === normalizedCode);
+  if (licenseIndex < 0) {
+    return { ok: false, message: 'License không hợp lệ hoặc đã được sử dụng.', status: getLicenseStatus() };
+  }
+
+  licenses.splice(licenseIndex, 1);
+  try {
+    writeLicensePool(licenseFile, licenses);
+  } catch (error) {
+    return {
+      ok: false,
+      message: `Không thể xóa license đã dùng khỏi file: ${error.message}`,
+      status: getLicenseStatus()
+    };
+  }
+
+  const state = readLicenseState();
+  writeLicenseState({
+    ...state,
+    licensed: true,
+    activatedAt: new Date().toISOString(),
+    licenseCode: normalizedCode
+  });
+
+  return { ok: true, message: 'Kích hoạt license thành công.', status: getLicenseStatus() };
+}
+
+function findLicenseFile() {
+  const candidatePaths = [
+    path.join(app.getPath('userData'), 'licenses.json'),
+    path.join(process.cwd(), 'licenses.json')
+  ];
+
+  if (app.isPackaged) {
+    candidatePaths.unshift(path.join(path.dirname(app.getPath('exe')), 'licenses.json'));
+  } else {
+    candidatePaths.unshift(path.join(__dirname, 'licenses.json'));
+  }
+
+  return candidatePaths.find((filePath) => fs.existsSync(filePath));
+}
+
+function readLicensePool(filePath) {
+  const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw.licenses)) return raw.licenses;
+  return [];
+}
+
+function writeLicensePool(filePath, licenses) {
+  fs.writeFileSync(filePath, JSON.stringify({ licenses }, null, 2), 'utf8');
+}
+
+function normalizeLicenseCode(code) {
+  return String(code || '').trim().toUpperCase();
+}
+
+function isLicenseFormat(code) {
+  return /^[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{4}$/.test(code);
 }
 
 function sendUpdateStatus(message) {
