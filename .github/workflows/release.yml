@@ -29,6 +29,12 @@ jobs:
       - name: Build Windows exe
         run: npm run build:win
 
+      - name: Build license generator
+        shell: powershell
+        run: |
+          $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          & $csc /nologo /target:exe /out:"release\license.exe" "tools\LicenseGenerator.cs"
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -36,4 +42,5 @@ jobs:
             release/Inventory-Compare-Setup-*.exe
             release/Inventory-Compare-Setup-*.exe.blockmap
             release/Inventory-Compare-Portable-*.exe
+            release/license.exe
             release/latest.yml
