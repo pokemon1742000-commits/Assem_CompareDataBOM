@@ -631,7 +631,7 @@ function detectBomColumns(rows) {
   rows.slice(0, 20).forEach((row, rowIndex) => {
     row.forEach((cell, colIndex) => {
       const text = normalizeText(cell);
-      if (!found.item && text.includes('ten mat hang')) {
+      if (!found.item && isBomItemHeader(text)) {
         map.item = colIndex;
         found.item = true;
         map.headerRow = Math.max(map.headerRow, rowIndex);
@@ -641,12 +641,12 @@ function detectBomColumns(rows) {
         found.drawing = true;
         map.headerRow = Math.max(map.headerRow, rowIndex);
       }
-      if (!found.manufacturer && text.includes('nha san xuat')) {
+      if (!found.manufacturer && isBomManufacturerHeader(text)) {
         map.manufacturer = colIndex;
         found.manufacturer = true;
         map.headerRow = Math.max(map.headerRow, rowIndex);
       }
-      if (!found.quantity && text.includes('so luong') && !text.includes('ton')) {
+      if (!found.quantity && isBomQuantityHeader(text)) {
         map.quantity = colIndex;
         found.quantity = true;
         map.headerRow = Math.max(map.headerRow, rowIndex);
@@ -655,6 +655,47 @@ function detectBomColumns(rows) {
   });
 
   return map;
+}
+
+function isBomItemHeader(text) {
+  return text.includes('ten mat hang') || matchesHeader(text, ['name', 'item name', 'part name']);
+}
+
+function isBomManufacturerHeader(text) {
+  return text.includes('nha san xuat') || matchesHeader(text, ['maker', 'manufacturer']);
+}
+
+function isBomQuantityHeader(text) {
+  if (text.includes('ton') || text.includes('number machine') || text.includes('grand total')) {
+    return false;
+  }
+
+  return (
+    text.includes('so luong') ||
+    matchesHeader(text, [
+      "q'ty/machine",
+      "q'ty / machine",
+      'qty/machine',
+      'qty / machine',
+      'quantity/machine',
+      'quantity / machine',
+      'qty per machine',
+      'quantity per machine'
+    ])
+  );
+}
+
+function matchesHeader(text, aliases) {
+  const compactText = text.replace(/\s+/g, '');
+  return aliases.some((alias) => {
+    const compactAlias = alias.replace(/\s+/g, '');
+    return (
+      text === alias ||
+      text.includes(alias) ||
+      compactText === compactAlias ||
+      compactText.includes(compactAlias)
+    );
+  });
 }
 
 function getBomQuantityCell(row, detectedQuantityIndex) {
