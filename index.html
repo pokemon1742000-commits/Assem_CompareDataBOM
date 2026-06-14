@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kiểm Soát Số Lượng Hàng Thừa Thiếu</title>
+  <title>Chuẩn Hóa Mã Hàng Thiết Kế</title>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
   <header class="app-header">
     <div>
-      <h1>Kiểm Soát Số Lượng Hàng Thừa Thiếu <span id="appVersion" class="app-version"></span></h1>
-      <p>Load dữ liệu kho, dữ liệu thiết kế, tự động so sánh và xuất Excel theo bảng đang xem.</p>
+      <h1>Chuẩn Hóa Mã Hàng Thiết Kế <span id="appVersion" class="app-version"></span></h1>
+      <p>Load mã đã đặt hàng, dữ liệu thiết kế, tự động so sánh mã và xuất Excel theo bảng đang xem.</p>
     </div>
     <div class="header-actions">
       <input id="searchInput" type="search" placeholder="Tìm mã bản vẽ, tên mặt hàng...">
@@ -21,12 +21,12 @@
   <div class="app-shell">
     <aside class="sidebar">
       <section class="side-card action-card">
-        <button id="loadKhoBtn" class="button action-button">Dữ Liệu Kho</button>
+        <button id="loadKhoBtn" class="button action-button">Mã Đã Đặt Hàng</button>
         <button id="loadBomBtn" class="button action-button">Dữ Liệu Thiết Kế</button>
         <button id="clearBtn" class="button action-button button-soft">Clear dữ liệu</button>
         <div class="side-status">
           <div class="file-status">
-            <strong>Dữ Liệu Kho</strong>
+            <strong>Mã Đã Đặt Hàng</strong>
             <span id="khoFileName">Chưa load file.</span>
           </div>
           <div class="file-status">
@@ -40,7 +40,7 @@
         <h3>Xem nhanh</h3>
         <div class="preview-grid">
           <div>
-            <span>Kho</span>
+            <span>Mã Đặt Hàng</span>
             <strong id="sideKhoCount">0</strong>
           </div>
           <div>
@@ -68,10 +68,10 @@
       <nav class="tabbar">
         <div class="tab-items">
           <button class="nav-item active" data-view="dashboard">Bảng thống kê</button>
-          <button class="nav-item" data-view="kho">Dữ Liệu Kho</button>
+          <button class="nav-item" data-view="kho">Dữ Liệu Mã</button>
           <button class="nav-item" data-view="bom">Dữ Liệu Thiết Kế</button>
           <button class="nav-item" data-view="compare">So Sánh</button>
-          <button class="nav-item" data-view="discrepancy">Thiếu Thừa</button>
+          <button class="nav-item" data-view="discrepancy">Mã Mới</button>
         </div>
         <div class="threshold-control">
           <label for="autoThreshold">Tự ghép</label>
@@ -86,7 +86,7 @@
       <section id="dashboardView" class="view active">
         <div class="stats-grid">
           <article class="stat-card">
-            <span>Dữ Liệu Kho</span>
+            <span>Mã Đã Đặt Hàng</span>
             <strong id="khoCount">0</strong>
           </article>
           <article class="stat-card">
@@ -94,15 +94,15 @@
             <strong id="bomCount">0</strong>
           </article>
           <article class="stat-card ok">
-            <span>Đủ hàng</span>
+            <span>Giống nhau</span>
             <strong id="okCount">0</strong>
           </article>
           <article class="stat-card missing">
-            <span>Thiếu hàng</span>
+            <span>Mã mới</span>
             <strong id="missingCount">0</strong>
           </article>
           <article class="stat-card extra">
-            <span>Thừa hàng</span>
+            <span>Khác mã</span>
             <strong id="extraCount">0</strong>
           </article>
           <article class="stat-card pending">
@@ -112,14 +112,14 @@
         </div>
         <div class="empty-state">
           <h2>Quy trình xử lý</h2>
-          <p>Chọn Dữ Liệu Kho và Dữ Liệu Thiết Kế. App sẽ tự động so sánh khi có đủ hai nguồn dữ liệu.</p>
+          <p>Chọn Mã Đã Đặt Hàng và Dữ Liệu Thiết Kế. App sẽ tự động so sánh khi có đủ hai nguồn dữ liệu.</p>
         </div>
       </section>
 
       <section id="khoView" class="view">
         <div class="view-header">
-          <h2>Dữ Liệu Kho</h2>
-          <p>Dữ liệu kho đã load và cộng dồn.</p>
+          <h2>Dữ Liệu Mã</h2>
+          <p>Dữ liệu mã đã đặt hàng dùng để chuẩn hóa mã thiết kế.</p>
         </div>
         <div id="khoTable" class="table-wrap"></div>
       </section>
@@ -135,7 +135,7 @@
       <section id="compareView" class="view">
         <div class="view-header">
           <h2>So Sánh</h2>
-          <p>Mã cần xác nhận nằm trên đầu; mã đủ nằm bên dưới.</p>
+          <p>Mã cần xác nhận nằm trên đầu; bảng giống nhau nằm bên dưới.</p>
         </div>
         <div id="confirmTable" class="table-wrap confirm-wrap"></div>
         <div id="compareTable" class="table-wrap"></div>
@@ -143,8 +143,8 @@
 
       <section id="discrepancyView" class="view">
         <div class="view-header">
-          <h2>Thiếu Thừa</h2>
-          <p>Các mã chỉ có trong một file hoặc lệch số lượng sau khi ghép.</p>
+          <h2>Mã Mới</h2>
+          <p>Các mã thiết kế chưa có trong danh sách mã đã đặt hàng.</p>
         </div>
         <div id="discrepancyTable" class="table-wrap"></div>
       </section>

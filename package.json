@@ -1,7 +1,7 @@
 {
-  "name": "inventory-compare-app",
-  "version": "3.0.0",
-  "description": "Phan mem so sanh du lieu kho va du lieu thiet ke tu Excel",
+  "name": "design-code-standardizer",
+  "version": "1.0.0",
+  "description": "Phan mem chuan hoa ma hang thiet ke tu Excel",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -13,8 +13,8 @@
   "author": "",
   "license": "ISC",
   "build": {
-    "appId": "com.local.inventorycompare",
-    "productName": "Inventory Compare",
+    "appId": "com.local.designcodestandardizer",
+    "productName": "Chuan Hoa Ma Hang Thiet Ke",
     "copyright": "Copyright (c) 2026",
     "directories": {
       "output": "release"
@@ -53,15 +53,15 @@
       ]
     },
     "nsis": {
-      "artifactName": "Inventory-Compare-Setup-${version}-${arch}.${ext}",
+      "artifactName": "Chuan-Hoa-Ma-Hang-Thiet-Ke-Setup-${version}-${arch}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Inventory Compare"
+      "shortcutName": "Chuan Hoa Ma Hang Thiet Ke"
     },
     "portable": {
-      "artifactName": "Inventory-Compare-Portable-${version}-${arch}.${ext}"
+      "artifactName": "Chuan-Hoa-Ma-Hang-Thiet-Ke-Portable-${version}-${arch}.${ext}"
     }
   },
   "devDependencies": {

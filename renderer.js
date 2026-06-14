@@ -21,53 +21,36 @@ const state = {
 const columns = {
   kho: [
     ['stt', 'STT', 'number'],
-    ['projectCode', 'Tên mã dự án'],
     ['drawingCode', 'Mã bản vẽ'],
-    ['quantity', 'Số lượng/máy', 'number'],
-    ['manufacturer', 'Nhà sản xuất'],
-    ['importDate', 'Ngày nhập kho'],
-    ['note', 'N/A']
+    ['itemName', 'Tên hàng'],
+    ['unit', 'Đơn vị tính']
   ],
   bom: [
     ['stt', 'STT', 'number'],
     ['itemName', 'Tên mặt hàng'],
     ['drawingCode', 'Mã bản vẽ'],
     ['manufacturer', 'Nhà sản xuất'],
-    ['quantity', 'Số lượng/máy', 'number']
+    ['quantity', 'Số lượng/máy', 'number'],
+    ['unit', 'Đơn vị tính']
   ],
   compare: [
     ['stt', 'STT', 'number'],
-    ['bomDrawingCode', 'Mã BOM'],
-    ['khoDrawingCode', 'Mã Kho'],
-    ['itemName', 'Tên mặt hàng'],
-    ['manufacturer', 'Nhà sản xuất'],
-    ['bomQuantity', 'SL BOM', 'number'],
-    ['khoQuantity', 'SL Kho', 'number'],
-    ['difference', 'Chênh lệch', 'number'],
-    ['status', 'Trạng thái'],
-    ['similarity', 'Độ tương đồng'],
-    ['mergeNote', 'Ghi chú']
+    ['orderDrawingCode', 'Mã đã đặt hàng'],
+    ['designDrawingCode', 'Mã thiết kế'],
+    ['orderItemName', 'Tên mã đặt hàng'],
+    ['unit', 'Đơn vị tính'],
+    ['note', 'Ghi chú']
   ],
   discrepancy: [
     ['stt', 'STT', 'number'],
-    ['source', 'Nguồn'],
-    ['bomDrawingCode', 'Mã BOM'],
-    ['khoDrawingCode', 'Mã Kho'],
-    ['itemName', 'Tên mặt hàng'],
-    ['manufacturer', 'Nhà sản xuất'],
-    ['bomQuantity', 'SL BOM', 'number'],
-    ['khoQuantity', 'SL Kho', 'number'],
-    ['difference', 'Chênh lệch', 'number'],
-    ['status', 'Trạng thái'],
-    ['note', 'Ghi chú']
+    ['designDrawingCode', 'Mã bản vẽ']
   ],
   confirm: [
     ['stt', 'STT', 'number'],
-    ['khoDrawingCode', 'Mã Kho'],
-    ['khoQuantity', 'SL Kho', 'number'],
-    ['bomSelect', 'Mã BOM đề xuất'],
+    ['designDrawingCode', 'Mã thiết kế'],
+    ['orderSelect', 'Mã đã đặt hàng đề xuất'],
     ['itemName', 'Tên mặt hàng'],
-    ['bomQuantity', 'SL BOM', 'number'],
+    ['unit', 'Đơn vị tính'],
     ['similarity', 'Độ tương đồng'],
     ['actions', 'Hành động']
   ]
@@ -220,11 +203,11 @@ async function loadKhoFile() {
     const files = await loadSelectedExcelFiles();
     if (!files.length) return;
 
-    const parsedRows = files.flatMap((file) => parseKhoRows(file.rows));
-    state.khoSources = appendSources(state.khoSources, files.map(toFileSource));
-    state.khoPaths = appendPaths(state.khoPaths, files.map((file) => file.filePath));
-    state.khoRows = renumberRows(state.khoRows.concat(parsedRows));
-    state.khoFileName = appendFileName(state.khoFileName, files.map(formatFileLabel).join('; '));
+    const parsedRows = files.flatMap((file) => parseOrderRows(file.rows));
+    state.khoSources = appendSources([], files.map(toFileSource));
+    state.khoPaths = appendPaths([], files.map((file) => file.filePath));
+    state.khoRows = renumberRows(parsedRows);
+    state.khoFileName = appendFileName('', files.map(formatOrderFileLabel).join('; '));
     state.compareRows = [];
     state.discrepancyRows = [];
     state.confirmRows = [];
@@ -233,9 +216,9 @@ async function loadKhoFile() {
 
     await saveRecentFiles();
     autoCompareAfterLoad('kho');
-    showToast(`Đã thêm ${parsedRows.length} dòng kho từ ${files.length} file. Tổng hiện có ${state.khoRows.length} dòng.`);
+    showToast(`Đã load ${parsedRows.length} mã đã đặt hàng từ ${files.length} file.`);
   } catch (error) {
-    showToast(`Không thể load file kho: ${error.message}`);
+    showToast(`Không thể load file Mã Đã Đặt Hàng: ${error.message}`);
   }
 }
 
@@ -451,9 +434,9 @@ async function restoreRecentFiles() {
     state.bomSources = bomFiles.map(toFileSource);
     state.khoPaths = state.khoSources.map((file) => file.filePath);
     state.bomPaths = state.bomSources.map((file) => file.filePath);
-    state.khoRows = renumberRows(khoFiles.flatMap((file) => parseKhoRows(file.rows)));
+    state.khoRows = renumberRows(khoFiles.flatMap((file) => parseOrderRows(file.rows)));
     state.bomRows = renumberRows(bomFiles.flatMap((file) => parseBomRows(file.rows)));
-    state.khoFileName = khoFiles.map(formatFileLabel).join('; ');
+    state.khoFileName = khoFiles.map(formatKhoFileLabel).join('; ');
     state.bomFileName = bomFiles.map(formatFileLabel).join('; ');
     state.compareRows = [];
     state.discrepancyRows = [];
@@ -495,6 +478,14 @@ function toFileSource(file) {
 
 function formatFileLabel(file) {
   return `${file.fileName} / ${file.sheetName}`;
+}
+
+function formatOrderFileLabel(file) {
+  return `${file.fileName} / Mã Đã Đặt Hàng`;
+}
+
+function formatKhoFileLabel(file) {
+  return tryParseOrderRows(file.rows).length ? formatOrderFileLabel(file) : formatFileLabel(file);
 }
 
 async function saveRecentFiles() {
@@ -547,22 +538,75 @@ function clearData() {
 }
 
 function parseKhoRows(rows) {
+  return parseOrderRows(rows);
+}
+
+function parseOrderRows(rows) {
+  const parsedRows = tryParseOrderRows(rows);
+  if (!parsedRows.length) {
+    throw new Error('Không tìm thấy cột Mã hàng tồn kho trong file Mã Đã Đặt Hàng.');
+  }
+  return parsedRows;
+}
+
+function tryParseOrderRows(rows) {
+  const map = detectOrderColumns(rows);
+  if (map.drawing < 0) return [];
+
   return rows
-    .map((row) => splitKhoCell(row[0]))
-    .filter(Boolean)
-    .map(normalizeKhoParts)
-    .map((parts, index) => ({
-      stt: index + 1,
-      projectCode: parts[0],
-      drawingCode: parts[1],
-      drawingKey: normalizeCode(parts[1]),
-      quantity: parseQuantity(parts[2]),
-      manufacturer: parts[3],
-      importCode: parts[4],
-      importDate: parts[5],
-      note: parts.slice(6).join(', ')
+    .slice(map.headerRow + 1)
+    .map((row) => ({
+      drawingCode: cleanCell(row[map.drawing]),
+      drawingKey: normalizeCode(row[map.drawing]),
+      itemName: cleanCell(row[map.itemName]),
+      unit: cleanCell(row[map.unit])
     }))
-    .filter((row) => row.drawingKey);
+    .filter((row) => row.drawingKey)
+    .map((row, index) => ({ ...row, stt: index + 1 }));
+}
+
+function detectOrderColumns(rows) {
+  const map = {
+    drawing: -1,
+    itemName: -1,
+    unit: -1,
+    headerRow: 0
+  };
+
+  rows.slice(0, 20).forEach((row, rowIndex) => {
+    row.forEach((cell, colIndex) => {
+      const text = normalizeText(cell);
+      if (map.drawing < 0 && isOrderCodeHeader(text)) {
+        map.drawing = colIndex;
+        map.headerRow = rowIndex;
+      }
+      if (map.itemName < 0 && isOrderItemHeader(text)) {
+        map.itemName = colIndex;
+      }
+      if (map.unit < 0 && isOrderUnitHeader(text)) {
+        map.unit = colIndex;
+      }
+    });
+  });
+
+  return map;
+}
+
+function isOrderCodeHeader(text) {
+  return (
+    text.includes('ma hang ton kho') ||
+    text.includes('ma hang dat hang') ||
+    text.includes('ma dat hang') ||
+    matchesHeader(text, ['part no', 'part number', 'item code', 'code'])
+  );
+}
+
+function isOrderItemHeader(text) {
+  return text.includes('ten hang') || text.includes('ten mat hang') || matchesHeader(text, ['item name', 'name']);
+}
+
+function isOrderUnitHeader(text) {
+  return text.includes('don vi tinh') || matchesHeader(text, ['unit', 'uom']);
 }
 
 function splitKhoCell(value) {
@@ -607,7 +651,9 @@ function parseBomRows(rows) {
       drawingCode: cleanCell(row[map.drawing]),
       drawingKey: normalizeCode(row[map.drawing]),
       manufacturer: cleanCell(row[map.manufacturer]),
-      quantity: parseQuantity(getBomQuantityCell(row, map.quantity))
+      quantity: parseQuantity(getBomQuantityCell(row, map.quantity)),
+      hasQuantity: true,
+      unit: cleanCell(row[map.unit])
     }))
     .filter((row) => row.drawingKey)
     .map((row, index) => ({ ...row, stt: index + 1 }));
@@ -619,6 +665,7 @@ function detectBomColumns(rows) {
     drawing: 2,
     manufacturer: 3,
     quantity: 8,
+    unit: -1,
     headerRow: 0
   };
   const found = {
@@ -650,6 +697,9 @@ function detectBomColumns(rows) {
         map.quantity = colIndex;
         found.quantity = true;
         map.headerRow = Math.max(map.headerRow, rowIndex);
+      }
+      if (map.unit < 0 && isOrderUnitHeader(text)) {
+        map.unit = colIndex;
       }
     });
   });
@@ -709,113 +759,70 @@ function getBomQuantityCell(row, detectedQuantityIndex) {
 function runCompare() {
   const autoThreshold = clamp(Number(els.autoThreshold.value) / 100, 0.8, 1);
   const confirmThreshold = clamp(Number(els.confirmThreshold.value) / 100, 0.5, autoThreshold);
-  const khoItems = aggregateRows(state.khoRows, 'kho');
-  const bomItems = aggregateRows(state.bomRows, 'bom');
-  if (!khoItems.length || !bomItems.length) {
+  const orderItems = aggregateRows(state.khoRows, 'order');
+  const designItems = aggregateRows(state.bomRows, 'design');
+  if (!orderItems.length || !designItems.length) {
     state.compareRows = [];
     state.confirmRows = [];
-    state.discrepancyRows = createSingleSourceDiscrepancyRows(khoItems, bomItems);
+    state.discrepancyRows = createSingleSourceDiscrepancyRows(orderItems, designItems);
     renderAll();
     return;
   }
 
-  const bomByKey = new Map(bomItems.map((item) => [item.drawingKey, item]));
-  const allRows = [];
+  const orderByKey = new Map(orderItems.map((item) => [item.drawingKey, item]));
   const compareRows = [];
-  const matchedBomKeys = new Set();
+  const newCodeRows = [];
   const confirmRows = [];
-  const confirmPairKeys = new Set();
 
-  khoItems.forEach((kho) => {
-    const manualBomKey = state.manualMatches.get(kho.drawingKey);
-    if (manualBomKey && bomByKey.has(manualBomKey)) {
-      const bom = bomByKey.get(manualBomKey);
-      matchedBomKeys.add(bom.drawingKey);
-      allRows.push(createCompareRow(bom, kho, 1));
+  designItems.forEach((design) => {
+    const manualOrderKey = state.manualMatches.get(design.drawingKey);
+    if (manualOrderKey && orderByKey.has(manualOrderKey)) {
+      const order = orderByKey.get(manualOrderKey);
+      compareRows.push(createCompareRow(design, order, 1, true));
       return;
     }
 
-    const exactBom = bomByKey.get(kho.drawingKey);
-    if (exactBom) {
-      matchedBomKeys.add(exactBom.drawingKey);
-      allRows.push(createCompareRow(exactBom, kho, 1));
+    const exactOrder = orderByKey.get(design.drawingKey);
+    if (exactOrder) {
+      compareRows.push(createCompareRow(design, exactOrder, 1, false));
       return;
     }
 
-    const candidates = findFuzzyMatches(kho, bomItems, confirmThreshold, 3)
-      .filter((candidate) => !state.rejectedMatches.has(`${kho.drawingKey}::${candidate.item.drawingKey}`));
+    const candidates = findFuzzyMatches(design, orderItems, confirmThreshold, 3)
+      .filter((candidate) => !state.rejectedMatches.has(`${design.drawingKey}::${candidate.item.drawingKey}`));
     const candidate = candidates[0];
 
     if (!candidate) {
-      allRows.push(createCompareRow(null, kho, 0));
+      newCodeRows.push(createNewCodeRow(design));
       return;
     }
 
     if (candidate.similarity >= autoThreshold) {
-      matchedBomKeys.add(candidate.item.drawingKey);
-      allRows.push(createCompareRow(candidate.item, kho, candidate.similarity));
+      confirmRows.push(createConfirmRow(design, candidates));
       return;
     }
 
     if (candidate.similarity >= confirmThreshold) {
-      if (!confirmPairKeys.has(kho.drawingKey)) {
-        confirmPairKeys.add(kho.drawingKey);
-        confirmRows.push(createConfirmRow(kho, candidates));
-      }
-      allRows.push(createCompareRow(null, kho, 0));
+      confirmRows.push(createConfirmRow(design, candidates));
       return;
     }
 
-    allRows.push(createCompareRow(null, kho, 0));
+    newCodeRows.push(createNewCodeRow(design));
   });
 
-  state.compareRows = allRows
-    .filter((row) => row.status === 'Đủ')
-    .map((row, index) => ({ ...row, stt: index + 1 }));
+  state.compareRows = compareRows.map((row, index) => ({ ...row, stt: index + 1 }));
   state.confirmRows = confirmRows.map((row, index) => ({ ...row, stt: index + 1 }));
-  state.discrepancyRows = createDiscrepancyRows(allRows, bomItems, matchedBomKeys);
+  state.discrepancyRows = newCodeRows.map((row, index) => ({ ...row, stt: index + 1 }));
   renderAll();
-  showToast(`So sánh xong: ${state.compareRows.length} dòng, ${state.discrepancyRows.length} dòng thiếu/thừa, ${state.confirmRows.length} dòng cần xác nhận.`);
+  showToast(`So sánh xong: ${state.compareRows.length} mã giống nhau, ${state.discrepancyRows.length} mã mới, ${state.confirmRows.length} mã cần xác nhận.`);
 }
 
-function createSingleSourceDiscrepancyRows(khoItems, bomItems) {
-  const rows = [];
-
-  if (khoItems.length && !bomItems.length) {
-    khoItems.forEach((kho) => {
-      rows.push({
-        source: 'Chỉ có trong kho',
-        bomDrawingCode: '',
-        khoDrawingCode: kho.drawingCode,
-        itemName: '',
-        manufacturer: kho.manufacturer,
-        bomQuantity: 0,
-        khoQuantity: kho.quantity,
-        difference: kho.quantity,
-        status: 'Thừa',
-        note: 'Chưa load Dữ Liệu Thiết Kế'
-      });
-    });
+function createSingleSourceDiscrepancyRows(orderItems, designItems) {
+  if (designItems.length && !orderItems.length) {
+    return designItems.map((design, index) => ({ ...createNewCodeRow(design), stt: index + 1 }));
   }
 
-  if (bomItems.length && !khoItems.length) {
-    bomItems.forEach((bom) => {
-      rows.push({
-        source: 'Chỉ có trong BOM',
-        bomDrawingCode: bom.drawingCode,
-        khoDrawingCode: '',
-        itemName: bom.itemName,
-        manufacturer: bom.manufacturer,
-        bomQuantity: bom.quantity,
-        khoQuantity: 0,
-        difference: -bom.quantity,
-        status: 'Thiếu',
-        note: 'Chưa load Dữ Liệu Kho'
-      });
-    });
-  }
-
-  return rows.map((row, index) => ({ ...row, stt: index + 1 }));
+  return [];
 }
 
 function createDiscrepancyRows(allRows, bomItems, matchedBomKeys) {
@@ -865,16 +872,19 @@ function aggregateRows(rows, type) {
         drawingKey: row.drawingKey,
         drawingCode: row.drawingCode,
         quantity: 0,
+        hasQuantity: row.hasQuantity !== false,
         mergeCount: 0,
-        itemName: type === 'bom' ? row.itemName : '',
-        manufacturer: row.manufacturer || ''
+        itemName: row.itemName || '',
+        manufacturer: row.manufacturer || '',
+        unit: row.unit || ''
       });
     }
     const item = map.get(row.drawingKey);
-    item.quantity += Number(row.quantity) || 0;
+    item.quantity = (Number(item.quantity) || 0) + (Number(row.quantity) || 0);
     item.mergeCount += 1;
     if (!item.itemName && row.itemName) item.itemName = row.itemName;
     if (!item.manufacturer && row.manufacturer) item.manufacturer = row.manufacturer;
+    if (!item.unit && row.unit) item.unit = row.unit;
   });
   return Array.from(map.values());
 }
@@ -883,55 +893,59 @@ function findFuzzyMatches(source, candidates, minSimilarity, limit) {
   if (candidates.length === 0) return [];
 
   return candidates
-    .map((item) => ({ item, similarity: stringSimilarity(source.drawingKey, item.drawingKey) }))
+    .map((item) => ({ item, similarity: itemSimilarity(source, item) }))
     .filter((match) => match.similarity >= minSimilarity)
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, limit);
 }
 
-function createCompareRow(bom, kho, similarity) {
-  const bomQuantity = bom ? bom.quantity : 0;
-  const khoQuantity = kho ? kho.quantity : 0;
-  const difference = khoQuantity - bomQuantity;
-  let status = 'Đủ';
-  if (!bom && kho) status = 'Thừa';
-  else if (difference < 0) status = 'Thiếu';
-  else if (difference > 0) status = 'Thừa';
+function itemSimilarity(source, candidate) {
+  const codeScore = stringSimilarity(source.drawingKey, candidate.drawingKey);
+  const sourceUnit = normalizeText(source.unit);
+  const candidateUnit = normalizeText(candidate.unit);
+  const unitScore = sourceUnit && candidateUnit ? stringSimilarity(sourceUnit, candidateUnit) : 0;
+  return (codeScore * 0.8) + (unitScore * 0.2);
+}
 
+function createCompareRow(design, order, similarity, corrected) {
   return {
-    bomKey: bom ? bom.drawingKey : '',
-    khoKey: kho ? kho.drawingKey : '',
-    bomDrawingCode: bom ? bom.drawingCode : '',
-    khoDrawingCode: kho ? kho.drawingCode : '',
-    itemName: bom ? bom.itemName : '',
-    manufacturer: bom?.manufacturer || kho?.manufacturer || '',
-    bomQuantity,
-    khoQuantity,
-    difference,
-    status,
+    designKey: design.drawingKey,
+    orderKey: order.drawingKey,
+    designDrawingCode: design.drawingCode,
+    orderDrawingCode: order.drawingCode,
+    orderItemName: order.itemName,
+    itemName: design.itemName || order.itemName,
+    unit: order.unit || design.unit,
+    corrected,
     similarity: similarity ? `${Math.round(similarity * 100)}%` : '',
-    mergeNote: kho && kho.mergeCount > 1 ? `Có gộp ${kho.mergeCount} dòng, tổng SL ${kho.quantity}` : ''
+    note: corrected ? `Mã ${design.drawingCode} không chính xác mã đúng là ${order.drawingCode}` : ''
   };
 }
 
-function createConfirmRow(kho, candidates) {
+function createNewCodeRow(design) {
+  return {
+    designKey: design.drawingKey,
+    designDrawingCode: design.drawingCode
+  };
+}
+
+function createConfirmRow(design, candidates) {
   const options = candidates.map((candidate) => ({
-    bomKey: candidate.item.drawingKey,
-    bomDrawingCode: candidate.item.drawingCode,
+    orderKey: candidate.item.drawingKey,
+    orderDrawingCode: candidate.item.drawingCode,
     itemName: candidate.item.itemName,
-    bomQuantity: candidate.item.quantity,
+    unit: candidate.item.unit || design.unit,
     similarity: `${Math.round(candidate.similarity * 100)}%`
   }));
   const selected = options[0] || {};
 
   return {
-    khoKey: kho.drawingKey,
-    khoDrawingCode: kho.drawingCode,
-    bomKey: selected.bomKey || '',
-    bomDrawingCode: selected.bomDrawingCode || '',
-    itemName: selected.itemName || '',
-    bomQuantity: selected.bomQuantity || 0,
-    khoQuantity: kho.quantity,
+    designKey: design.drawingKey,
+    designDrawingCode: design.drawingCode,
+    orderKey: selected.orderKey || '',
+    orderDrawingCode: selected.orderDrawingCode || '',
+    itemName: selected.itemName || design.itemName || '',
+    unit: selected.unit || design.unit || '',
     similarity: selected.similarity || '',
     selectedIndex: 0,
     options
@@ -943,7 +957,7 @@ function acceptConfirm(index) {
   if (!row) return;
   const selected = row.options[row.selectedIndex] || row.options[0];
   if (!selected) return;
-  state.manualMatches.set(row.khoKey, selected.bomKey);
+  state.manualMatches.set(row.designKey, selected.orderKey);
   runCompare();
 }
 
@@ -951,7 +965,7 @@ function rejectConfirm(index) {
   const row = state.confirmRows[index];
   if (!row) return;
   row.options.forEach((option) => {
-    state.rejectedMatches.add(`${row.khoKey}::${option.bomKey}`);
+    state.rejectedMatches.add(`${row.designKey}::${option.orderKey}`);
   });
   runCompare();
 }
@@ -974,18 +988,18 @@ async function exportCurrentTable() {
 
     if (state.view === 'discrepancy') {
       if (!state.discrepancyRows.length) {
-        showToast('Chưa có dữ liệu Thiếu Thừa để xuất.');
+        showToast('Chưa có dữ liệu Mã Mới để xuất.');
         return;
       }
 
       const filePath = await window.inventoryApi.exportDiscrepancy({
         discrepancyRows: state.discrepancyRows
       });
-      if (filePath) showToast(`Đã xuất bảng Thiếu Thừa: ${filePath}`);
+      if (filePath) showToast(`Đã xuất bảng Mã Mới: ${filePath}`);
       return;
     }
 
-    showToast('Hãy chọn bảng So Sánh hoặc Thiếu Thừa trước khi xuất Excel.');
+    showToast('Hãy chọn bảng So Sánh hoặc Mã Mới trước khi xuất Excel.');
   } catch (error) {
     showToast(`Không thể xuất Excel: ${error.message}`);
   }
@@ -1005,13 +1019,13 @@ function setView(view) {
 function renderAll() {
   els.khoFileName.textContent = formatLoadedFiles(state.khoFileName);
   els.bomFileName.textContent = formatLoadedFiles(state.bomFileName);
-  els.loadKhoBtn.textContent = state.khoRows.length ? 'Thêm Dữ Liệu Kho' : 'Dữ Liệu Kho';
+  els.loadKhoBtn.textContent = state.khoRows.length ? 'Load Lại Mã Đã Đặt Hàng' : 'Mã Đã Đặt Hàng';
   els.loadBomBtn.textContent = state.bomRows.length ? 'Thêm Dữ Liệu Thiết Kế' : 'Dữ Liệu Thiết Kế';
   els.exportExcelBtn.disabled = !canExportCurrentTable();
 
-  const okCount = state.compareRows.filter((row) => row.status === 'Đủ').length;
-  const missingCount = state.discrepancyRows.filter((row) => row.status === 'Thiếu').length;
-  const extraCount = state.discrepancyRows.filter((row) => row.status === 'Thừa').length;
+  const okCount = state.compareRows.length;
+  const missingCount = state.discrepancyRows.length;
+  const extraCount = state.confirmRows.length;
 
   els.khoCount.textContent = state.khoRows.length;
   els.bomCount.textContent = state.bomRows.length;
@@ -1047,7 +1061,12 @@ function renderTable(container, rows, tableColumns, rowClassFn) {
 
   const thead = tableColumns.map(([, label, align]) => `<th class="${align || ''}">${escapeHtml(label)}</th>`).join('');
   const tbody = rows.map((row) => {
-    const cells = tableColumns.map(([key, , align]) => `<td class="${align || ''}">${escapeHtml(row[key])}</td>`).join('');
+    const cells = tableColumns.map(([key, , align]) => {
+      if (key === 'designDrawingCode' && row.corrected) {
+        return `<td class="${align || ''}"><s>${escapeHtml(row[key])}</s></td>`;
+      }
+      return `<td class="${align || ''}">${escapeHtml(row[key])}</td>`;
+    }).join('');
     return `<tr class="${rowClassFn ? rowClassFn(row) : ''}">${cells}</tr>`;
   }).join('');
 
@@ -1068,15 +1087,15 @@ function renderConfirmTable() {
 
   const thead = columns.confirm.map(([, label, align]) => `<th class="${align || ''}">${escapeHtml(label)}</th>`).join('');
   const tbody = rows.map((row) => {
-    const actualIndex = state.confirmRows.findIndex((item) => item.khoKey === row.khoKey);
+    const actualIndex = state.confirmRows.findIndex((item) => item.designKey === row.designKey);
     const cells = columns.confirm.map(([key, , align]) => {
       if (key === 'actions') {
         return `<td><div class="row-actions"><button class="mini-button confirm" data-action="accept" data-index="${actualIndex}">Chọn</button><button class="mini-button reject" data-action="reject" data-index="${actualIndex}">Bỏ qua</button></div></td>`;
       }
-      if (key === 'bomSelect') {
+      if (key === 'orderSelect') {
         const options = row.options.map((option, optionIndex) => {
           const selected = optionIndex === row.selectedIndex ? ' selected' : '';
-          return `<option value="${optionIndex}"${selected}>${escapeHtml(option.bomDrawingCode)} - ${escapeHtml(option.similarity)}</option>`;
+          return `<option value="${optionIndex}"${selected}>${escapeHtml(option.orderDrawingCode)} - ${escapeHtml(option.similarity)}</option>`;
         }).join('');
         return `<td><select class="bom-select" data-index="${actualIndex}">${options}</select></td>`;
       }
@@ -1106,10 +1125,10 @@ function updateConfirmSelection(index, selectedIndex) {
   if (!row || !row.options[selectedIndex]) return;
   const selected = row.options[selectedIndex];
   row.selectedIndex = selectedIndex;
-  row.bomKey = selected.bomKey;
-  row.bomDrawingCode = selected.bomDrawingCode;
+  row.orderKey = selected.orderKey;
+  row.orderDrawingCode = selected.orderDrawingCode;
   row.itemName = selected.itemName;
-  row.bomQuantity = selected.bomQuantity;
+  row.unit = selected.unit;
   row.similarity = selected.similarity;
 }
 

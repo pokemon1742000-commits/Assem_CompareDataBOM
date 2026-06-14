@@ -119,32 +119,28 @@ ipcMain.handle('excel:export', async (_event, payload) => {
   workbook.creator = 'Inventory Compare App';
   workbook.created = new Date();
 
-  addSheet(workbook, 'Kho Quet Ma', [
-    ['STT', 'Ten ma du an', 'Ma ban ve', 'So luong/may', 'Nha san xuat', 'Ngay nhap kho', 'N/A']
+  addSheet(workbook, 'Du Lieu Ma', [
+    ['STT', 'Ma ban ve', 'Ten hang', 'Don vi tinh']
   ], payload.khoRows.map((row, index) => [
     index + 1,
-    row.projectCode,
     row.drawingCode,
-    row.quantity,
-    row.manufacturer,
-    row.importDate,
-    row.note
+    row.itemName,
+    row.unit
   ]));
 
   addSheet(workbook, 'Bomlist Thiet Ke', [
-    ['STT', 'Ten mat hang', 'Ma ban ve', 'Nha san xuat', 'So luong/may']
+    ['STT', 'Ten mat hang', 'Ma ban ve', 'Nha san xuat', 'So luong/may', 'Don vi tinh']
   ], payload.bomRows.map((row, index) => [
     index + 1,
     row.itemName,
     row.drawingCode,
     row.manufacturer,
-    row.quantity
+    row.quantity,
+    row.unit
   ]));
 
-  addCompareSheet(workbook, payload.compareRows);
+  addCompareSheetWithConfirm(workbook, payload.compareRows || [], payload.confirmRows || []);
   addDiscrepancySheet(workbook, payload.discrepancyRows || []);
-
-  addConfirmSheet(workbook, payload.confirmRows || []);
 
   await workbook.xlsx.writeFile(result.filePath);
   return result.filePath;
@@ -164,8 +160,7 @@ ipcMain.handle('excel:exportCompare', async (_event, payload) => {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Inventory Compare App';
   workbook.created = new Date();
-  addCompareSheet(workbook, payload.compareRows || []);
-  addConfirmSheet(workbook, payload.confirmRows || []);
+  addCompareSheetWithConfirm(workbook, payload.compareRows || [], payload.confirmRows || []);
 
   await workbook.xlsx.writeFile(result.filePath);
   return result.filePath;
@@ -173,8 +168,8 @@ ipcMain.handle('excel:exportCompare', async (_event, payload) => {
 
 ipcMain.handle('excel:exportDiscrepancy', async (_event, payload) => {
   const result = await dialog.showSaveDialog({
-    title: 'Luu bang Thieu Thua',
-    defaultPath: `ThieuThua_${getTimestamp()}.xlsx`,
+    title: 'Luu bang Ma Moi',
+    defaultPath: `MaMoi_${getTimestamp()}.xlsx`,
     filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }]
   });
 
@@ -193,22 +188,61 @@ ipcMain.handle('excel:exportDiscrepancy', async (_event, payload) => {
 
 function addCompareSheet(workbook, compareRows) {
   const compareSheet = addSheet(workbook, 'So Sanh', [
-    ['STT', 'Ma BOM', 'Ma Kho', 'Ten mat hang', 'Nha san xuat', 'So luong BOM', 'So luong Kho', 'Chenh lech', 'Trang thai', 'Do tuong dong', 'Ghi chu']
+    ['Bang Giong Nhau'],
+    ['STT', 'Ma da dat hang', 'Ma thiet ke', 'Ten ma dat hang', 'Don vi tinh', 'Ghi chu']
   ], compareRows.map((row, index) => [
     index + 1,
-    row.bomDrawingCode,
-    row.khoDrawingCode,
-    row.itemName,
-    row.manufacturer,
-    row.bomQuantity,
-    row.khoQuantity,
-    row.difference,
-    row.status,
-    row.similarity,
-    row.mergeNote
+    row.orderDrawingCode,
+    row.designDrawingCode,
+    row.orderItemName,
+    row.unit,
+    row.note
   ]));
 
+  compareRows.forEach((row, index) => {
+    if (!row.corrected) return;
+    compareSheet.getRow(index + 3).getCell(3).font = { name: 'Times New Roman', strike: true };
+  });
+
   return compareSheet;
+}
+
+function addCompareSheetWithConfirm(workbook, compareRows, confirmRows) {
+  const sheet = workbook.addWorksheet('So Sanh');
+
+  sheet.addRow(['Bang Xac Nhan']);
+  sheet.addRow(['STT', 'Ma thiet ke', 'Ma da dat hang de xuat', 'Ten mat hang', 'Don vi tinh', 'Do tuong dong']);
+  (confirmRows || []).forEach((row, index) => {
+    sheet.addRow([
+      index + 1,
+      row.designDrawingCode,
+      row.orderDrawingCode,
+      row.itemName,
+      row.unit,
+      row.similarity
+    ]);
+  });
+
+  sheet.addRow([]);
+  sheet.addRow(['Bang Giong Nhau']);
+  sheet.addRow(['STT', 'Ma da dat hang', 'Ma thiet ke', 'Ten ma dat hang', 'Don vi tinh', 'Ghi chu']);
+  const compareStartRow = sheet.rowCount + 1;
+  (compareRows || []).forEach((row, index) => {
+    sheet.addRow([
+      index + 1,
+      row.orderDrawingCode,
+      row.designDrawingCode,
+      row.orderItemName,
+      row.unit,
+      row.note
+    ]);
+    if (row.corrected) {
+      sheet.getRow(compareStartRow + index).getCell(3).font = { name: 'Times New Roman', strike: true };
+    }
+  });
+
+  formatSheet(sheet);
+  return sheet;
 }
 
 function readExcelInfo(filePath) {
@@ -286,7 +320,7 @@ function writeRecentState(payload) {
   fs.writeFileSync(getRecentStatePath(), JSON.stringify(payload, null, 2), 'utf8');
 }
 
-function addDiscrepancySheet(workbook, discrepancyRows) {
+function addDiscrepancySheetLegacy(workbook, discrepancyRows) {
   const sheet = addSheet(workbook, 'Thieu Thua', [
     ['STT', 'Nguon', 'Ma BOM', 'Ma Kho', 'Ten mat hang', 'Nha san xuat', 'So luong BOM', 'So luong Kho', 'Chenh lech', 'Trang thai', 'Ghi chu']
   ], discrepancyRows.map((row, index) => [
@@ -329,6 +363,15 @@ function addConfirmSheet(workbook, confirmRows) {
   ]));
 }
 
+function addDiscrepancySheet(workbook, discrepancyRows) {
+  return addSheet(workbook, 'Ma Moi', [
+    ['STT', 'Ma ban ve']
+  ], discrepancyRows.map((row, index) => [
+    index + 1,
+    row.designDrawingCode
+  ]));
+}
+
 function addSheet(workbook, name, headerRows, dataRows) {
   const sheet = workbook.addWorksheet(name);
   headerRows.concat(dataRows).forEach((row) => sheet.addRow(row));
@@ -362,6 +405,37 @@ function addSheet(workbook, name, headerRows, dataRows) {
 
   sheet.views = [{ state: 'frozen', ySplit: 1 }];
   return sheet;
+}
+
+function formatSheet(sheet) {
+  sheet.eachRow((row) => {
+    const values = row.values.filter((value) => value !== null && value !== undefined && value !== '');
+    const isHeader = row.number === 1 || row.number === 2 || values.length === 1 || values[0] === 'STT';
+    row.eachCell((cell) => {
+      cell.font = { name: 'Times New Roman', bold: isHeader, strike: cell.font?.strike };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'D9E0EA' } },
+        left: { style: 'thin', color: { argb: 'D9E0EA' } },
+        bottom: { style: 'thin', color: { argb: 'D9E0EA' } },
+        right: { style: 'thin', color: { argb: 'D9E0EA' } }
+      };
+      if (isHeader) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'DBEAFE' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      }
+    });
+  });
+
+  sheet.columns.forEach((column) => {
+    let maxLength = 12;
+    column.eachCell({ includeEmpty: true }, (cell) => {
+      const value = cell.value == null ? '' : String(cell.value);
+      maxLength = Math.max(maxLength, value.length + 2);
+    });
+    column.width = Math.min(maxLength, 42);
+  });
+
+  sheet.views = [{ state: 'frozen', ySplit: 1 }];
 }
 
 function emphasizeRow(row) {
