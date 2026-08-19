@@ -1,10 +1,32 @@
 const { execFileSync } = require('node:child_process');
 const packageJson = require('../package.json');
 
-const [version, releaseMessage = `Release v${version || ''}`] = process.argv.slice(2);
+const [requestedVersion, requestedMessage] = process.argv.slice(2);
+
+function parseVersion(value) {
+  const match = String(value || '').match(/^v?(\d+)\.(\d+)\.(\d+)$/);
+  return match ? { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]) } : null;
+}
+
+function nextVersion() {
+  let latest = parseVersion(packageJson.version) || { major: 0, minor: 0, patch: 0 };
+  try {
+    const output = execFileSync('gh.exe', [
+      'release', 'list', '--repo', 'pokemon1742000-commits/Assem_CompareDataBOM',
+      '--limit', '1', '--json', 'tagName', '--jq', '.[0].tagName'
+    ], { encoding: 'utf8', windowsHide: true }).trim();
+    latest = parseVersion(output) || latest;
+  } catch {
+    // Dùng version trong package.json nếu chưa lấy được latest từ GitHub.
+  }
+  return `${latest.major}.${latest.minor}.${latest.patch + 1}`;
+}
+
+const version = requestedVersion || nextVersion();
+const releaseMessage = requestedMessage || `Release v${version}`;
 
 if (!version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version)) {
-  console.error('Cach dung: npm run release:auto -- 3.0.1 "Release v3.0.1"');
+  console.error('Cach dung: npm run release:auto [-- version "Release message"]');
   process.exit(1);
 }
 
