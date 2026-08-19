@@ -1,6 +1,6 @@
 {
   "name": "inventory-compare-app",
-  "version": "3.0.5",
+  "version": "3.0.6",
   "description": "Phan mem so sanh du lieu kho va du lieu thiet ke tu Excel",
   "main": "main.js",
   "scripts": {
@@ -54,8 +54,8 @@
     },
     "nsis": {
       "artifactName": "Inventory-Compare-Setup-v${version}-${arch}.${ext}",
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
+      "oneClick": true,
+      "perMachine": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Inventory Compare"

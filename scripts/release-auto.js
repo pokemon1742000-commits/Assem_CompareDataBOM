@@ -13,7 +13,8 @@ function nextVersion() {
   try {
     const output = execFileSync('gh.exe', [
       'release', 'list', '--repo', 'pokemon1742000-commits/Assem_CompareDataBOM',
-      '--limit', '1', '--json', 'tagName', '--jq', '.[0].tagName'
+      '--limit', '20', '--json', 'tagName,isDraft',
+      '--jq', '[.[] | select(.isDraft == false)][0].tagName'
     ], { encoding: 'utf8', windowsHide: true }).trim();
     latest = parseVersion(output) || latest;
   } catch {
@@ -24,6 +25,8 @@ function nextVersion() {
 
 const version = requestedVersion || nextVersion();
 const releaseMessage = requestedMessage || `Release v${version}`;
+const repository = 'pokemon1742000-commits/Assem_CompareDataBOM';
+const tag = `v${version}`;
 
 if (!version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version)) {
   console.error('Cach dung: npm run release:auto [-- version "Release message"]');
@@ -59,9 +62,8 @@ if (packageJson.version !== version) {
 } else {
   console.log(`Version ${version} da duoc cap nhat, bo qua buoc npm version.`);
 }
-run('npm', ['run', 'build:win', '--', '--publish', 'always'], {
-  GH_TOKEN: getGithubToken()
-});
+const githubToken = getGithubToken();
+run('npm', ['run', 'build:win', '--', '--publish', 'never']);
 run('git', ['add', '-A']);
 
 try {
@@ -72,4 +74,17 @@ try {
 }
 
 run('git', ['push', 'origin', 'HEAD']);
-console.log(`\nDa phat hanh v${version} len GitHub Releases.`);
+
+const releaseAssets = [
+  `release/Inventory-Compare-Setup-v${version}-x64.exe`,
+  `release/Inventory-Compare-Setup-v${version}-x64.exe.blockmap`,
+  'release/latest.yml'
+];
+run('gh', [
+  'release', 'create', tag, ...releaseAssets,
+  '--repo', repository,
+  '--title', tag,
+  '--notes', releaseMessage,
+  '--latest'
+], { GH_TOKEN: githubToken });
+console.log(`\nDa phat hanh ${tag} voi mot release duy nhat len GitHub.`);
