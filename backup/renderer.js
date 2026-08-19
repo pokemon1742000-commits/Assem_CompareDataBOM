@@ -2,6 +2,7 @@ const state = {
   view: 'dashboard',
   search: '',
   appVersion: '',
+  licenseStatus: null,
   khoFileName: '',
   bomFileName: '',
   khoPaths: [],
@@ -80,8 +81,6 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAppVersion();
   renderAll();
   restoreRecentFiles();
-  requestAnimationFrame(updateNavIndicator);
-  window.addEventListener('resize', updateNavIndicator);
 });
 
 function bindElements() {
@@ -91,10 +90,18 @@ function bindElements() {
     'clearBtn',
     'updateBtn',
     'infoBtn',
+    'licenseBtn',
     'exportExcelBtn',
     'searchInput',
     'autoThreshold',
     'confirmThreshold',
+    'appVersion',
+    'trialStatus',
+    'licenseOverlay',
+    'expiredLicenseInput',
+    'expiredLicenseBtn',
+    'quitAppBtn',
+    'expiredLicenseMessage',
     'khoCount',
     'bomCount',
     'sideKhoCount',
@@ -107,14 +114,8 @@ function bindElements() {
     'bomFileName',
     'khoTable',
     'bomTable',
-    'soSanhTable',
-    'duHangTable',
-    'soSanhTableCount',
-    'duHangTableCount',
-    'missingTable',
-    'extraTable',
-    'missingTableCount',
-    'extraTableCount',
+    'compareTable',
+    'discrepancyTable',
     'confirmTable',
     'toast'
   ].forEach((id) => {
@@ -132,6 +133,12 @@ function bindEvents() {
   els.clearBtn.addEventListener('click', clearData);
   els.updateBtn.addEventListener('click', checkForUpdates);
   els.infoBtn.addEventListener('click', openGithubInfo);
+  if (els.licenseBtn) {
+    els.licenseBtn.hidden = true;
+    els.licenseBtn.addEventListener('click', showLicenseDialog);
+  }
+  els.expiredLicenseBtn.addEventListener('click', activateExpiredLicense);
+  els.quitAppBtn.addEventListener('click', () => window.inventoryApi.quitApp());
   els.exportExcelBtn.addEventListener('click', exportCurrentTable);
   window.inventoryApi.onUpdateStatus((message) => showToast(message));
   document.querySelectorAll('.theme-dot').forEach((button) => {
@@ -162,9 +169,50 @@ function applyTheme(themeName) {
 async function renderAppVersion() {
   try {
     state.appVersion = await window.inventoryApi.getAppVersion();
+    await refreshLicenseStatus();
   } catch {
-    state.appVersion = '';
+    els.appVersion.textContent = 'Trial';
   }
+}
+
+async function refreshLicenseStatus() {
+  state.licenseStatus = await window.inventoryApi.getLicenseStatus();
+  renderLicenseStatus();
+}
+
+function renderLicenseStatus() {
+  const status = state.licenseStatus;
+  if (!status) return;
+
+  if (status.licensed) {
+    els.appVersion.textContent = `v${status.appVersion || state.appVersion}`;
+    els.trialStatus.textContent = '';
+    els.licenseOverlay.hidden = true;
+    if (els.licenseBtn) els.licenseBtn.hidden = true;
+    return;
+  }
+
+  els.appVersion.textContent = 'Trial';
+  els.trialStatus.textContent = `Trial còn lại: ${formatRemainingTime(status.remainingMs)}`;
+  els.licenseOverlay.hidden = !status.trialExpired;
+}
+
+function startLicenseTimer() {
+  clearInterval(startLicenseTimer.timer);
+  startLicenseTimer.timer = setInterval(async () => {
+    if (!state.licenseStatus?.licensed) {
+      await refreshLicenseStatus();
+    }
+  }, 1000);
+}
+
+function formatRemainingTime(ms) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${days} ngày ${hours} giờ ${minutes} phút ${seconds} giây`;
 }
 
 async function loadKhoFile() {
@@ -254,6 +302,60 @@ async function openGithubInfo() {
       showToast(`Không thể mở GitHub: ${error.message}`);
     }
   });
+}
+
+function showLicenseDialog() {
+  const overlay = document.createElement('div');
+  overlay.className = 'sheet-modal-overlay';
+  overlay.innerHTML = `
+    <div class="info-modal">
+      <header>
+        <h2>Nhập License</h2>
+        <p>Nhập mã license dạng XXX-XXX-XXX-XXXX để kích hoạt bản vĩnh viễn.</p>
+      </header>
+      <div class="info-content">
+        <div class="license-form">
+          <input class="license-input" type="text" placeholder="XXX-XXX-XXX-XXXX" maxlength="16">
+          <button class="button button-primary" data-action="activate">Kích hoạt</button>
+        </div>
+        <div class="license-message"></div>
+      </div>
+      <footer>
+        <button class="button" data-action="close">Đóng</button>
+      </footer>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  const input = overlay.querySelector('.license-input');
+  const message = overlay.querySelector('.license-message');
+  input.focus();
+
+  overlay.querySelector('[data-action="close"]').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('[data-action="activate"]').addEventListener('click', async () => {
+    const result = await activateLicenseCode(input.value);
+    message.textContent = result.message;
+    message.classList.toggle('ok', result.ok);
+    if (result.ok) {
+      setTimeout(() => overlay.remove(), 800);
+    }
+  });
+}
+
+async function activateExpiredLicense() {
+  const result = await activateLicenseCode(els.expiredLicenseInput.value);
+  els.expiredLicenseMessage.textContent = result.message;
+  els.expiredLicenseMessage.classList.toggle('ok', result.ok);
+}
+
+async function activateLicenseCode(code) {
+  const result = await window.inventoryApi.activateLicense(code);
+  state.licenseStatus = result.status;
+  renderLicenseStatus();
+  if (result.ok) {
+    els.expiredLicenseInput.value = '';
+  }
+  return result;
 }
 
 async function loadSelectedExcelFiles() {
@@ -360,7 +462,7 @@ async function restoreRecentFiles() {
     state.rejectedMatches.clear();
 
     runCompare();
-    setView(state.khoRows.length || state.bomRows.length ? 'compare' : 'dashboard');
+    setView(state.khoRows.length || state.bomRows.length ? 'discrepancy' : 'dashboard');
     showToast('Đã khôi phục đường dẫn và dữ liệu file lần trước.');
   } catch (error) {
     showToast(`Không thể khôi phục file lần trước: ${error.message}`);
@@ -406,7 +508,7 @@ async function saveRecentFiles() {
 
 function autoCompareAfterLoad(fallbackView) {
   runCompare();
-  setView(state.khoRows.length && state.bomRows.length ? 'compare' : fallbackView);
+  setView(state.khoRows.length && state.bomRows.length ? 'discrepancy' : fallbackView);
 }
 
 function appendFileName(current, next) {
@@ -856,19 +958,34 @@ function rejectConfirm(index) {
 
 async function exportCurrentTable() {
   try {
-    if (!state.khoRows.length && !state.bomRows.length) {
-      showToast('Chưa có dữ liệu để xuất.');
+    if (state.view === 'compare') {
+      if (!state.compareRows.length && !state.confirmRows.length) {
+        showToast('Chưa có dữ liệu So Sánh để xuất.');
+        return;
+      }
+
+      const filePath = await window.inventoryApi.exportCompare({
+        compareRows: state.compareRows,
+        confirmRows: state.confirmRows
+      });
+      if (filePath) showToast(`Đã xuất bảng So Sánh: ${filePath}`);
       return;
     }
 
-    const filePath = await window.inventoryApi.exportExcel({
-      khoRows: state.khoRows,
-      bomRows: state.bomRows,
-      compareRows: state.compareRows,
-      discrepancyRows: state.discrepancyRows,
-      confirmRows: state.confirmRows
-    });
-    if (filePath) showToast(`Đã xuất báo cáo: ${filePath}`);
+    if (state.view === 'discrepancy') {
+      if (!state.discrepancyRows.length) {
+        showToast('Chưa có dữ liệu Thiếu Thừa để xuất.');
+        return;
+      }
+
+      const filePath = await window.inventoryApi.exportDiscrepancy({
+        discrepancyRows: state.discrepancyRows
+      });
+      if (filePath) showToast(`Đã xuất bảng Thiếu Thừa: ${filePath}`);
+      return;
+    }
+
+    showToast('Hãy chọn bảng So Sánh hoặc Thiếu Thừa trước khi xuất Excel.');
   } catch (error) {
     showToast(`Không thể xuất Excel: ${error.message}`);
   }
@@ -882,41 +999,7 @@ function setView(view) {
   document.querySelectorAll('.view').forEach((section) => {
     section.classList.toggle('active', section.id === `${view}View`);
   });
-  updateNavIndicator();
   renderAll();
-}
-
-function updateNavIndicator() {
-  const indicator = document.querySelector('.nav-indicator');
-  const activeBtn = document.querySelector('.nav-item.active');
-  if (!indicator || !activeBtn) return;
-  const container = activeBtn.parentElement;
-  const containerRect = container.getBoundingClientRect();
-  const btnRect = activeBtn.getBoundingClientRect();
-  const left = btnRect.left - containerRect.left + container.scrollLeft;
-  indicator.style.width = `${btnRect.width}px`;
-  indicator.style.transform = `translateX(${left}px)`;
-}
-
-function animateNumber(el, endValue) {
-  if (!el) return;
-  const startValue = Number(el.dataset.value ?? el.textContent) || 0;
-  endValue = Number(endValue) || 0;
-  el.dataset.value = endValue;
-  if (startValue === endValue) {
-    el.textContent = endValue;
-    return;
-  }
-  const duration = 400;
-  const startTime = performance.now();
-  function tick(now) {
-    const progress = Math.min((now - startTime) / duration, 1);
-    const eased = 1 - Math.pow(1 - progress, 3);
-    const current = Math.round(startValue + (endValue - startValue) * eased);
-    el.textContent = current;
-    if (progress < 1) requestAnimationFrame(tick);
-  }
-  requestAnimationFrame(tick);
 }
 
 function renderAll() {
@@ -930,14 +1013,14 @@ function renderAll() {
   const missingCount = state.discrepancyRows.filter((row) => row.status === 'Thiếu').length;
   const extraCount = state.discrepancyRows.filter((row) => row.status === 'Thừa').length;
 
-  animateNumber(els.khoCount, state.khoRows.length);
-  animateNumber(els.bomCount, state.bomRows.length);
-  animateNumber(els.sideKhoCount, state.khoRows.length);
-  animateNumber(els.sideBomCount, state.bomRows.length);
-  animateNumber(els.okCount, okCount);
-  animateNumber(els.missingCount, missingCount);
-  animateNumber(els.extraCount, extraCount);
-  animateNumber(els.confirmCount, state.confirmRows.length);
+  els.khoCount.textContent = state.khoRows.length;
+  els.bomCount.textContent = state.bomRows.length;
+  els.sideKhoCount.textContent = state.khoRows.length;
+  els.sideBomCount.textContent = state.bomRows.length;
+  els.okCount.textContent = okCount;
+  els.missingCount.textContent = missingCount;
+  els.extraCount.textContent = extraCount;
+  els.confirmCount.textContent = state.confirmRows.length;
 
   renderCurrentTable();
 }
@@ -945,13 +1028,15 @@ function renderAll() {
 function renderCurrentTable() {
   renderTable(els.khoTable, filterRows(state.khoRows), columns.kho);
   renderTable(els.bomTable, filterRows(state.bomRows), columns.bom);
-  renderCompareTables();
-  renderDiscrepancyTables();
+  renderTable(els.compareTable, filterRows(state.compareRows), columns.compare, statusClass);
+  renderTable(els.discrepancyTable, filterRows(state.discrepancyRows), columns.discrepancy, statusClass);
   renderConfirmTable();
 }
 
 function canExportCurrentTable() {
-  return state.khoRows.length > 0 || state.bomRows.length > 0;
+  if (state.view === 'compare') return state.compareRows.length > 0 || state.confirmRows.length > 0;
+  if (state.view === 'discrepancy') return state.discrepancyRows.length > 0;
+  return false;
 }
 
 function renderTable(container, rows, tableColumns, rowClassFn) {
@@ -967,32 +1052,6 @@ function renderTable(container, rows, tableColumns, rowClassFn) {
   }).join('');
 
   container.innerHTML = `<table><thead><tr>${thead}</tr></thead><tbody>${tbody}</tbody></table>`;
-}
-
-function renderCompareTables() {
-  const rows = filterRows(state.compareRows);
-  const renumber = (list) => list.map((row, index) => ({ ...row, stt: index + 1 }));
-  const otherRows = renumber(rows.filter((row) => row.status !== 'Đủ'));
-  const sufficientRows = renumber(rows.filter((row) => row.status === 'Đủ'));
-
-  renderTable(els.soSanhTable, otherRows, columns.compare, statusClass);
-  renderTable(els.duHangTable, sufficientRows, columns.compare, statusClass);
-
-  if (els.soSanhTableCount) els.soSanhTableCount.textContent = otherRows.length;
-  if (els.duHangTableCount) els.duHangTableCount.textContent = sufficientRows.length;
-}
-
-function renderDiscrepancyTables() {
-  const rows = filterRows(state.discrepancyRows);
-  const renumber = (list) => list.map((row, index) => ({ ...row, stt: index + 1 }));
-  const missingRows = renumber(rows.filter((row) => row.status === 'Thiếu'));
-  const extraRows = renumber(rows.filter((row) => row.status === 'Thừa'));
-
-  renderTable(els.missingTable, missingRows, columns.discrepancy, statusClass);
-  renderTable(els.extraTable, extraRows, columns.discrepancy, statusClass);
-
-  if (els.missingTableCount) els.missingTableCount.textContent = missingRows.length;
-  if (els.extraTableCount) els.extraTableCount.textContent = extraRows.length;
 }
 
 function renderConfirmTable() {

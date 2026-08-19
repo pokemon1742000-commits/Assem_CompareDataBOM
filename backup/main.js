@@ -106,8 +106,8 @@ ipcMain.handle('recent:clear', async () => {
 
 ipcMain.handle('excel:export', async (_event, payload) => {
   const result = await dialog.showSaveDialog({
-    title: 'Luu bao cao',
-    defaultPath: `BaoCao_${getTimestamp()}.xlsx`,
+    title: 'Luu bao cao so sanh',
+    defaultPath: `BaoCao_SoSanh_${getTimestamp()}.xlsx`,
     filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }]
   });
 
@@ -115,28 +115,13 @@ ipcMain.handle('excel:export', async (_event, payload) => {
     return null;
   }
 
-  const khoRows = payload.khoRows || [];
-  const bomRows = payload.bomRows || [];
-  const compareRows = payload.compareRows || [];
-  const discrepancyRows = payload.discrepancyRows || [];
-  const confirmRows = payload.confirmRows || [];
-
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Inventory Compare App';
   workbook.created = new Date();
 
-  addStatsSheet(workbook, {
-    khoCount: khoRows.length,
-    bomCount: bomRows.length,
-    okCount: compareRows.filter((row) => row.status === 'Đủ').length,
-    missingCount: discrepancyRows.filter((row) => row.status === 'Thiếu').length,
-    extraCount: discrepancyRows.filter((row) => row.status === 'Thừa').length,
-    confirmCount: confirmRows.length
-  });
-
-  addSheet(workbook, 'Dữ Liệu Kho', [
+  addSheet(workbook, 'Kho Quet Ma', [
     ['STT', 'Ten ma du an', 'Ma ban ve', 'So luong/may', 'Nha san xuat', 'Ngay nhap kho', 'N/A']
-  ], khoRows.map((row, index) => [
+  ], payload.khoRows.map((row, index) => [
     index + 1,
     row.projectCode,
     row.drawingCode,
@@ -146,9 +131,9 @@ ipcMain.handle('excel:export', async (_event, payload) => {
     row.note
   ]));
 
-  addSheet(workbook, 'Dữ Liệu Thiết Kế', [
+  addSheet(workbook, 'Bomlist Thiet Ke', [
     ['STT', 'Ten mat hang', 'Ma ban ve', 'Nha san xuat', 'So luong/may']
-  ], bomRows.map((row, index) => [
+  ], payload.bomRows.map((row, index) => [
     index + 1,
     row.itemName,
     row.drawingCode,
@@ -156,13 +141,14 @@ ipcMain.handle('excel:export', async (_event, payload) => {
     row.quantity
   ]));
 
-  addCompareSheet(workbook, compareRows);
-  addDiscrepancySheet(workbook, discrepancyRows);
+  addCompareSheet(workbook, payload.compareRows);
+  addDiscrepancySheet(workbook, payload.discrepancyRows || []);
+
+  addConfirmSheet(workbook, payload.confirmRows || []);
 
   await workbook.xlsx.writeFile(result.filePath);
   return result.filePath;
 });
-
 
 ipcMain.handle('excel:exportCompare', async (_event, payload) => {
   const result = await dialog.showSaveDialog({
@@ -205,22 +191,10 @@ ipcMain.handle('excel:exportDiscrepancy', async (_event, payload) => {
   return result.filePath;
 });
 
-function addStatsSheet(workbook, stats) {
-  const headers = ['Chỉ số', 'Số lượng'];
-  const rows = [
-    ['Dữ Liệu Kho', stats.khoCount],
-    ['Dữ Liệu Thiết Kế', stats.bomCount],
-    ['Đủ hàng', stats.okCount],
-    ['Thiếu hàng', stats.missingCount],
-    ['Thừa hàng', stats.extraCount],
-    ['Cần xác nhận', stats.confirmCount]
-  ];
-  return addSheet(workbook, 'Bảng Thống Kê', [headers], rows);
-}
-
 function addCompareSheet(workbook, compareRows) {
-  const headers = ['STT', 'Ma BOM', 'Ma Kho', 'Ten mat hang', 'Nha san xuat', 'So luong BOM', 'So luong Kho', 'Chenh lech', 'Trang thai', 'Do tuong dong', 'Ghi chu'];
-  const toValues = (row, index) => [
+  const compareSheet = addSheet(workbook, 'So Sanh', [
+    ['STT', 'Ma BOM', 'Ma Kho', 'Ten mat hang', 'Nha san xuat', 'So luong BOM', 'So luong Kho', 'Chenh lech', 'Trang thai', 'Do tuong dong', 'Ghi chu']
+  ], compareRows.map((row, index) => [
     index + 1,
     row.bomDrawingCode,
     row.khoDrawingCode,
@@ -232,24 +206,9 @@ function addCompareSheet(workbook, compareRows) {
     row.status,
     row.similarity,
     row.mergeNote
-  ];
+  ]));
 
-  const sufficientRows = compareRows.filter((row) => row.status === 'Đủ');
-  const otherRows = compareRows.filter((row) => row.status !== 'Đủ');
-
-  const compareSheet = addSheet(workbook, 'So Sánh', [headers], otherRows.map(toValues), {
-    countLabel: 'Tổng số mã',
-    countFillArgb: 'FFF4CC',
-    countFontArgb: '92400E'
-  });
-
-  const sufficientSheet = addSheet(workbook, 'Đủ Hàng', [headers], sufficientRows.map(toValues), {
-    countLabel: 'Tổng số mã',
-    countFillArgb: 'DFF7E7',
-    countFontArgb: '15803D'
-  });
-
-  return { compareSheet, sufficientSheet };
+  return compareSheet;
 }
 
 function readExcelInfo(filePath) {
@@ -345,22 +304,68 @@ function addDiscrepancySheet(workbook, discrepancyRows) {
 
   const missingRows = discrepancyRows.filter((row) => row.status === 'Thiếu');
   const extraRows = discrepancyRows.filter((row) => row.status === 'Thừa');
-  const missingSheet = addSheet(workbook, 'Thiếu', [headers], missingRows.map(toValues), {
-    countLabel: 'Tổng số mã',
-    countFillArgb: 'FCE4E4',
-    countFontArgb: '9B1C1C'
-  });
-  const extraSheet = addSheet(workbook, 'Thừa', [headers], extraRows.map(toValues), {
-    countLabel: 'Tổng số mã',
-    countFillArgb: 'EDE4FF',
-    countFontArgb: '5B21B6'
+  const sheet = workbook.addWorksheet('Thieu Thua');
+  let currentRow = addDiscrepancyTable(sheet, 1, 'Du lieu Thieu', 'DuLieuThieu', headers, missingRows.map(toValues), true);
+  addDiscrepancyTable(sheet, currentRow, 'Du lieu Thua', 'DuLieuThua', headers, extraRows.map(toValues), false);
+  return sheet;
+}
+
+function addDiscrepancyTable(sheet, startRow, title, tableName, headers, dataRows, emphasizeMissing) {
+  sheet.getCell(startRow, 1).value = title;
+  sheet.getCell(startRow, 1).font = { name: 'Times New Roman', bold: true, size: 12 };
+  sheet.getCell(startRow, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'BFDBFE' } };
+
+  const headerRow = startRow + 1;
+  headers.forEach((header, index) => {
+    const cell = sheet.getCell(headerRow, index + 1);
+    cell.value = header;
+    cell.font = { name: 'Times New Roman', bold: true };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'DBEAFE' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
   });
 
-  missingSheet.eachRow((row, rowNumber) => {
-    if (rowNumber > missingSheet.headerRowNumber) emphasizeRow(row);
+  dataRows.forEach((values, index) => {
+    const row = sheet.getRow(headerRow + 1 + index);
+    values.forEach((value, columnIndex) => {
+      row.getCell(columnIndex + 1).value = value;
+    });
+    if (emphasizeMissing) emphasizeRow(row);
   });
 
-  return { missingSheet, extraSheet };
+  const endRow = headerRow + dataRows.length;
+  for (let rowNumber = startRow; rowNumber <= endRow; rowNumber += 1) {
+    sheet.getRow(rowNumber).eachCell({ includeEmpty: true }, (cell) => {
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'D9E0EA' } },
+        left: { style: 'thin', color: { argb: 'D9E0EA' } },
+        bottom: { style: 'thin', color: { argb: 'D9E0EA' } },
+        right: { style: 'thin', color: { argb: 'D9E0EA' } }
+      };
+    });
+  }
+
+  if (dataRows.length) {
+    sheet.addTable({
+      name: tableName,
+      ref: `A${headerRow}:K${endRow}`,
+      headerRow: true,
+      totalsRow: false,
+      style: { theme: 'TableStyleMedium2', showRowStripes: true },
+      columns: headers.map((name) => ({ name })),
+      rows: dataRows
+    });
+  }
+
+  sheet.columns.forEach((column) => {
+    let maxLength = 12;
+    column.eachCell({ includeEmpty: true }, (cell) => {
+      const value = cell.value == null ? '' : String(cell.value);
+      maxLength = Math.max(maxLength, value.length + 2);
+    });
+    column.width = Math.min(maxLength, 36);
+  });
+
+  return endRow + 2;
 }
 
 function addConfirmSheet(workbook, confirmRows) {
@@ -378,35 +383,19 @@ function addConfirmSheet(workbook, confirmRows) {
   ]));
 }
 
-function addSheet(workbook, name, headerRows, dataRows, options = {}) {
+function addSheet(workbook, name, headerRows, dataRows) {
   const sheet = workbook.addWorksheet(name);
-  const columnCount = (headerRows[0] || []).length || 1;
-  let headerRowNumber = 1;
-
-  if (options.countLabel) {
-    const countRow = sheet.addRow([`${options.countLabel}: ${dataRows.length}`]);
-    sheet.mergeCells(countRow.number, 1, countRow.number, columnCount);
-    const countCell = countRow.getCell(1);
-    countCell.font = { name: 'Times New Roman', bold: true, color: { argb: options.countFontArgb || '1F2937' } };
-    countCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: options.countFillArgb || 'E5E7EB' } };
-    countCell.alignment = { vertical: 'middle', horizontal: 'left' };
-    headerRowNumber = countRow.number + 1;
-  }
-
   headerRows.concat(dataRows).forEach((row) => sheet.addRow(row));
 
-  sheet.getRow(headerRowNumber).eachCell((cell) => {
+  sheet.getRow(1).eachCell((cell) => {
     cell.font = { name: 'Times New Roman', bold: true };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'DBEAFE' } };
     cell.alignment = { vertical: 'middle', horizontal: 'center' };
   });
 
   sheet.eachRow((row) => {
-    const isCountRow = options.countLabel && row.number === 1 && headerRowNumber !== 1;
     row.eachCell((cell) => {
-      if (!isCountRow) {
-        cell.font = { name: 'Times New Roman', bold: row.number === headerRowNumber };
-      }
+      cell.font = { name: 'Times New Roman', bold: row.number === 1 };
       cell.border = {
         top: { style: 'thin', color: { argb: 'D9E0EA' } },
         left: { style: 'thin', color: { argb: 'D9E0EA' } },
@@ -425,8 +414,7 @@ function addSheet(workbook, name, headerRows, dataRows, options = {}) {
     column.width = Math.min(maxLength, 36);
   });
 
-  sheet.views = [{ state: 'frozen', ySplit: headerRowNumber }];
-  sheet.headerRowNumber = headerRowNumber;
+  sheet.views = [{ state: 'frozen', ySplit: 1 }];
   return sheet;
 }
 

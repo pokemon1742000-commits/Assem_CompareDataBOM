@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kiểm Soát Số Lượng Hàng Thừa Thiếu</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>Kiểm Soát Số Lượng Hàng Thừa Thiếu <span id="appVersion" class="app-version"></span></h1>
+      <p>Load dữ liệu kho, dữ liệu thiết kế, tự động so sánh và xuất Excel theo bảng đang xem.</p>
+    </div>
+    <div class="header-actions">
+      <input id="searchInput" type="search" placeholder="Tìm mã bản vẽ, tên mặt hàng...">
+      <button id="exportExcelBtn" class="button button-primary" disabled>Xuất Excel</button>
+    </div>
+  </header>
+
+  <div class="app-shell">
+    <aside class="sidebar">
+      <section class="side-card action-card">
+        <button id="loadKhoBtn" class="button action-button">Dữ Liệu Kho</button>
+        <button id="loadBomBtn" class="button action-button">Dữ Liệu Thiết Kế</button>
+        <button id="clearBtn" class="button action-button button-soft">Clear dữ liệu</button>
+        <div class="side-status">
+          <div class="file-status">
+            <strong>Dữ Liệu Kho</strong>
+            <span id="khoFileName">Chưa load file.</span>
+          </div>
+          <div class="file-status">
+            <strong>Dữ Liệu Thiết Kế</strong>
+            <span id="bomFileName">Chưa load file.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="side-card preview-card">
+        <h3>Xem nhanh</h3>
+        <div class="preview-grid">
+          <div>
+            <span>Kho</span>
+            <strong id="sideKhoCount">0</strong>
+          </div>
+          <div>
+            <span>BOM</span>
+            <strong id="sideBomCount">0</strong>
+          </div>
+        </div>
+        <div class="preview-actions">
+          <button id="updateBtn" class="button button-primary">Update</button>
+          <button id="infoBtn" class="button">Thông tin</button>
+          <button id="licenseBtn" class="button">License</button>
+        </div>
+        <div id="trialStatus" class="trial-status"></div>
+      </section>
+
+      <div class="theme-dots" aria-label="Chọn theme">
+        <button class="theme-dot dot-sunrise active" data-theme="default" title="Bình minh"></button>
+        <button class="theme-dot dot-mint" data-theme="mint" title="Bạc hà"></button>
+        <button class="theme-dot dot-sky" data-theme="sky" title="Bầu trời"></button>
+        <button class="theme-dot dot-lavender" data-theme="lavender" title="Oải hương"></button>
+      </div>
+    </aside>
+
+    <main class="content">
+      <nav class="tabbar">
+        <div class="tab-items">
+          <button class="nav-item active" data-view="dashboard">Bảng thống kê</button>
+          <button class="nav-item" data-view="kho">Dữ Liệu Kho</button>
+          <button class="nav-item" data-view="bom">Dữ Liệu Thiết Kế</button>
+          <button class="nav-item" data-view="compare">So Sánh</button>
+          <button class="nav-item" data-view="discrepancy">Thiếu Thừa</button>
+        </div>
+        <div class="threshold-control">
+          <label for="autoThreshold">Tự ghép</label>
+          <input id="autoThreshold" type="number" min="80" max="100" step="1" value="95">
+          <span>%</span>
+          <label for="confirmThreshold">Cần xác nhận</label>
+          <input id="confirmThreshold" type="number" min="50" max="99" step="1" value="70">
+          <span>%</span>
+        </div>
+      </nav>
+
+      <section id="dashboardView" class="view active">
+        <div class="stats-grid">
+          <article class="stat-card">
+            <span>Dữ Liệu Kho</span>
+            <strong id="khoCount">0</strong>
+          </article>
+          <article class="stat-card">
+            <span>Dữ Liệu Thiết Kế</span>
+            <strong id="bomCount">0</strong>
+          </article>
+          <article class="stat-card ok">
+            <span>Đủ hàng</span>
+            <strong id="okCount">0</strong>
+          </article>
+          <article class="stat-card missing">
+            <span>Thiếu hàng</span>
+            <strong id="missingCount">0</strong>
+          </article>
+          <article class="stat-card extra">
+            <span>Thừa hàng</span>
+            <strong id="extraCount">0</strong>
+          </article>
+          <article class="stat-card pending">
+            <span>Cần xác nhận</span>
+            <strong id="confirmCount">0</strong>
+          </article>
+        </div>
+        <div class="empty-state">
+          <h2>Quy trình xử lý</h2>
+          <p>Chọn Dữ Liệu Kho và Dữ Liệu Thiết Kế. App sẽ tự động so sánh khi có đủ hai nguồn dữ liệu.</p>
+        </div>
+      </section>
+
+      <section id="khoView" class="view">
+        <div class="view-header">
+          <h2>Dữ Liệu Kho</h2>
+          <p>Dữ liệu kho đã load và cộng dồn.</p>
+        </div>
+        <div id="khoTable" class="table-wrap"></div>
+      </section>
+
+      <section id="bomView" class="view">
+        <div class="view-header">
+          <h2>Dữ Liệu Thiết Kế</h2>
+          <p>Dữ liệu BOM đã load và cộng dồn.</p>
+        </div>
+        <div id="bomTable" class="table-wrap"></div>
+      </section>
+
+      <section id="compareView" class="view">
+        <div class="view-header">
+          <h2>So Sánh</h2>
+          <p>Mã cần xác nhận nằm trên đầu; mã đủ nằm bên dưới.</p>
+        </div>
+        <div id="confirmTable" class="table-wrap confirm-wrap"></div>
+        <div id="compareTable" class="table-wrap"></div>
+      </section>
+
+      <section id="discrepancyView" class="view">
+        <div class="view-header">
+          <h2>Thiếu Thừa</h2>
+          <p>Các mã chỉ có trong một file hoặc lệch số lượng sau khi ghép.</p>
+        </div>
+        <div id="discrepancyTable" class="table-wrap"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <div id="licenseOverlay" class="license-overlay" hidden>
+    <div class="license-panel">
+      <h2>Trial đã hết hạn</h2>
+      <p>Vui lòng nhập license hợp lệ để tiếp tục sử dụng phần mềm.</p>
+      <div class="license-form">
+        <input id="expiredLicenseInput" type="text" placeholder="XXX-XXX-XXX-XXXX" maxlength="16">
+        <button id="expiredLicenseBtn" class="button button-primary">Kích hoạt</button>
+        <button id="quitAppBtn" class="button">Tắt phần mềm</button>
+      </div>
+      <div id="expiredLicenseMessage" class="license-message"></div>
+    </div>
+  </div>
+  <script src="./node_modules/fuse.js/dist/fuse.min.js"></script>
+  <script src="./renderer.js"></script>
+</body>
+</html>
