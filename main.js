@@ -533,7 +533,7 @@ function sendUpdateStatus(message) {
 
 function setupAutoUpdater() {
   autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoInstallOnAppQuit = false;
 
   autoUpdater.on('checking-for-update', () => {
     sendUpdateStatus('Đang kiểm tra phiên bản mới...');
