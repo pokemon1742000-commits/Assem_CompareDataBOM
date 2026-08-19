@@ -1,6 +1,6 @@
 {
   "name": "inventory-compare-app",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "description": "Phan mem so sanh du lieu kho va du lieu thiet ke tu Excel",
   "main": "main.js",
   "scripts": {
@@ -35,8 +35,13 @@
       "style.css",
       "README.md",
       "package.json",
-      "node_modules/**/*"
+      "!node_modules/**/*.map",
+      "!node_modules/**/*.md",
+      "!node_modules/**/*.d.ts",
+      "!node_modules/**/test{,s}/**",
+      "!node_modules/**/__tests__/**"
     ],
+    "compression": "maximum",
     "win": {
       "target": [
         {
@@ -72,7 +77,6 @@
   "dependencies": {
     "electron-updater": "^6.8.9",
     "exceljs": "^4.4.0",
-    "fuse.js": "^7.4.2",
     "xlsx": "^0.18.5"
   }
 }

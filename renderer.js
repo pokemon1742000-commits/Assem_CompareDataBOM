@@ -107,15 +107,14 @@ function bindElements() {
     'bomFileName',
     'khoTable',
     'bomTable',
-    'soSanhTable',
     'duHangTable',
-    'soSanhTableCount',
     'duHangTableCount',
     'missingTable',
     'extraTable',
     'missingTableCount',
     'extraTableCount',
     'confirmTable',
+    'confirmTableCount',
     'toast'
   ].forEach((id) => {
     els[id] = document.getElementById(id);
@@ -972,13 +971,10 @@ function renderTable(container, rows, tableColumns, rowClassFn) {
 function renderCompareTables() {
   const rows = filterRows(state.compareRows);
   const renumber = (list) => list.map((row, index) => ({ ...row, stt: index + 1 }));
-  const otherRows = renumber(rows.filter((row) => row.status !== 'Đủ'));
   const sufficientRows = renumber(rows.filter((row) => row.status === 'Đủ'));
 
-  renderTable(els.soSanhTable, otherRows, columns.compare, statusClass);
   renderTable(els.duHangTable, sufficientRows, columns.compare, statusClass);
 
-  if (els.soSanhTableCount) els.soSanhTableCount.textContent = otherRows.length;
   if (els.duHangTableCount) els.duHangTableCount.textContent = sufficientRows.length;
 }
 
@@ -1002,6 +998,7 @@ function renderConfirmTable() {
   }
 
   const rows = filterRows(state.confirmRows);
+  if (els.confirmTableCount) els.confirmTableCount.textContent = rows.length;
   if (!rows.length) {
     els.confirmTable.innerHTML = '<div class="placeholder">Không có mã cần xác nhận.</div>';
     return;

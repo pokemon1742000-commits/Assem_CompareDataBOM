@@ -164,16 +164,13 @@
       <section id="compareView" class="view">
         <div class="view-header">
           <h2>So Sánh</h2>
-          <p>Mã cần xác nhận nằm trên đầu; bên dưới là bảng So Sánh (các mã lệch, thiếu, thừa sau khi ghép).</p>
+          <p>Danh sách mã cần xác nhận sau khi ghép dữ liệu.</p>
+        </div>
+        <div class="discrepancy-block-header block-compare confirm-summary">
+          <h3>Mã cần xác nhận</h3>
+          <span id="confirmTableCount" class="discrepancy-count">0</span>
         </div>
         <div id="confirmTable" class="table-wrap confirm-wrap"></div>
-        <div class="discrepancy-block">
-          <div class="discrepancy-block-header block-compare">
-            <h3>So Sánh</h3>
-            <span id="soSanhTableCount" class="discrepancy-count">0</span>
-          </div>
-          <div id="soSanhTable" class="table-wrap"></div>
-        </div>
       </section>
 
       <section id="sufficientView" class="view">
@@ -222,7 +219,6 @@
   </div>
 
   <div id="toast" class="toast" hidden></div>
-  <script src="./node_modules/fuse.js/dist/fuse.min.js"></script>
   <script src="./renderer.js"></script>
 </body>
 </html>
