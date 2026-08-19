@@ -6,7 +6,6 @@ const ExcelJS = require('exceljs');
 const { autoUpdater } = require('electron-updater');
 
 let mainWindow;
-const TRIAL_DAYS = 7;
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -36,10 +35,6 @@ ipcMain.handle('app:openGithub', async () => {
   await shell.openExternal('https://github.com/pokemon1742000-commits/Assem_CompareDataBOM');
   return true;
 });
-
-ipcMain.handle('app:licenseStatus', async () => getLicenseStatus());
-
-ipcMain.handle('app:activateLicense', async (_event, code) => activateLicense(code));
 
 ipcMain.handle('app:quit', async () => {
   app.quit();
@@ -428,89 +423,6 @@ function getTimestamp() {
   const now = new Date();
   const pad = (value) => String(value).padStart(2, '0');
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
-}
-
-function getLicenseStatePath() {
-  return path.join(app.getPath('userData'), 'license-state.json');
-}
-
-function readLicenseState() {
-  const defaultState = {
-    installedAt: new Date().toISOString(),
-    licensed: false,
-    activatedAt: '',
-    licenseCode: ''
-  };
-
-  try {
-    if (!fs.existsSync(getLicenseStatePath())) {
-      writeLicenseState(defaultState);
-      return defaultState;
-    }
-
-    const state = JSON.parse(fs.readFileSync(getLicenseStatePath(), 'utf8'));
-    return { ...defaultState, ...state };
-  } catch {
-    writeLicenseState(defaultState);
-    return defaultState;
-  }
-}
-
-function writeLicenseState(state) {
-  fs.mkdirSync(path.dirname(getLicenseStatePath()), { recursive: true });
-  fs.writeFileSync(getLicenseStatePath(), JSON.stringify(state, null, 2), 'utf8');
-}
-
-function getLicenseStatus() {
-  return {
-    appVersion: app.getVersion(),
-    licensed: true,
-    trialDays: TRIAL_DAYS,
-    trialEndsAt: '',
-    remainingMs: 0,
-    trialExpired: false
-  };
-}
-
-function activateLicense(code) {
-  return { ok: true, message: 'Phần mềm đang ở bản dùng vĩnh viễn.', status: getLicenseStatus() };
-}
-
-function findLicenseFile() {
-  const candidatePaths = [
-    path.join(app.getPath('userData'), 'licenses.json'),
-    process.env.APPDATA ? path.join(process.env.APPDATA, 'Inventory Compare', 'licenses.json') : '',
-    process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Inventory Compare', 'licenses.json') : '',
-    path.join(process.cwd(), 'licenses.json'),
-    path.join(process.cwd(), 'release', 'licenses.json'),
-    path.join(__dirname, 'licenses.json'),
-    path.join(__dirname, 'release', 'licenses.json')
-  ];
-
-  if (app.isPackaged) {
-    candidatePaths.unshift(path.join(path.dirname(app.getPath('exe')), 'licenses.json'));
-  }
-
-  return candidatePaths.filter(Boolean).find((filePath) => fs.existsSync(filePath));
-}
-
-function readLicensePool(filePath) {
-  const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  if (Array.isArray(raw)) return raw;
-  if (Array.isArray(raw.licenses)) return raw.licenses;
-  return [];
-}
-
-function writeLicensePool(filePath, licenses) {
-  fs.writeFileSync(filePath, JSON.stringify({ licenses }, null, 2), 'utf8');
-}
-
-function normalizeLicenseCode(code) {
-  return String(code || '').trim().toUpperCase();
-}
-
-function isLicenseFormat(code) {
-  return /^[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{4}$/.test(code);
 }
 
 function sendUpdateStatus(message) {

@@ -1,12 +1,14 @@
 const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
+const { spawn } = require('node:child_process');
+const https = require('node:https');
 const path = require('node:path');
 const fs = require('node:fs');
 const XLSX = require('xlsx');
 const ExcelJS = require('exceljs');
-const { autoUpdater } = require('electron-updater');
 
 let mainWindow;
-const TRIAL_DAYS = 7;
+let updateInProgress = false;
+const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/pokemon1742000-commits/Assem_CompareDataBOM/main/update.json';
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -37,10 +39,6 @@ ipcMain.handle('app:openGithub', async () => {
   return true;
 });
 
-ipcMain.handle('app:licenseStatus', async () => getLicenseStatus());
-
-ipcMain.handle('app:activateLicense', async (_event, code) => activateLicense(code));
-
 ipcMain.handle('app:quit', async () => {
   app.quit();
   return true;
@@ -69,13 +67,28 @@ ipcMain.handle('update:check', async () => {
     return { message: 'Chức năng update chỉ hoạt động trên bản đã build exe.' };
   }
 
+  if (updateInProgress) {
+    return { message: 'Update đang được xử lý.' };
+  }
+
+  updateInProgress = true;
   try {
     sendUpdateStatus('Đang kiểm tra phiên bản mới...');
-    await autoUpdater.checkForUpdates();
-    return { message: 'Đang kiểm tra phiên bản mới...' };
+    const manifest = await fetchUpdateManifest();
+    if (!isNewerVersion(manifest.version, app.getVersion())) {
+      sendUpdateStatus('Bạn đang dùng phiên bản mới nhất.');
+      return { message: 'Bạn đang dùng phiên bản mới nhất.' };
+    }
+
+    sendUpdateStatus(`Có phiên bản mới ${manifest.version}. Đang tải về...`);
+    const installerPath = await downloadInstaller(manifest.url, manifest.version);
+    sendUpdateStatus('Đã tải xong. Đang cài đặt âm thầm và khởi động lại...');
+    installUpdate(installerPath);
+    return { message: `Đang cài đặt phiên bản ${manifest.version}...` };
   } catch (error) {
     const message = `Không thể kiểm tra update: ${error.message}`;
     sendUpdateStatus(message);
+    updateInProgress = false;
     return { message };
   }
 });
@@ -442,139 +455,109 @@ function getTimestamp() {
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
 }
 
-function getLicenseStatePath() {
-  return path.join(app.getPath('userData'), 'license-state.json');
-}
-
-function readLicenseState() {
-  const defaultState = {
-    installedAt: new Date().toISOString(),
-    licensed: false,
-    activatedAt: '',
-    licenseCode: ''
-  };
-
-  try {
-    if (!fs.existsSync(getLicenseStatePath())) {
-      writeLicenseState(defaultState);
-      return defaultState;
-    }
-
-    const state = JSON.parse(fs.readFileSync(getLicenseStatePath(), 'utf8'));
-    return { ...defaultState, ...state };
-  } catch {
-    writeLicenseState(defaultState);
-    return defaultState;
-  }
-}
-
-function writeLicenseState(state) {
-  fs.mkdirSync(path.dirname(getLicenseStatePath()), { recursive: true });
-  fs.writeFileSync(getLicenseStatePath(), JSON.stringify(state, null, 2), 'utf8');
-}
-
-function getLicenseStatus() {
-  return {
-    appVersion: app.getVersion(),
-    licensed: true,
-    trialDays: TRIAL_DAYS,
-    trialEndsAt: '',
-    remainingMs: 0,
-    trialExpired: false
-  };
-}
-
-function activateLicense(code) {
-  return { ok: true, message: 'Phần mềm đang ở bản dùng vĩnh viễn.', status: getLicenseStatus() };
-}
-
-function findLicenseFile() {
-  const candidatePaths = [
-    path.join(app.getPath('userData'), 'licenses.json'),
-    process.env.APPDATA ? path.join(process.env.APPDATA, 'Inventory Compare', 'licenses.json') : '',
-    process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Inventory Compare', 'licenses.json') : '',
-    path.join(process.cwd(), 'licenses.json'),
-    path.join(process.cwd(), 'release', 'licenses.json'),
-    path.join(__dirname, 'licenses.json'),
-    path.join(__dirname, 'release', 'licenses.json')
-  ];
-
-  if (app.isPackaged) {
-    candidatePaths.unshift(path.join(path.dirname(app.getPath('exe')), 'licenses.json'));
-  }
-
-  return candidatePaths.filter(Boolean).find((filePath) => fs.existsSync(filePath));
-}
-
-function readLicensePool(filePath) {
-  const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  if (Array.isArray(raw)) return raw;
-  if (Array.isArray(raw.licenses)) return raw.licenses;
-  return [];
-}
-
-function writeLicensePool(filePath, licenses) {
-  fs.writeFileSync(filePath, JSON.stringify({ licenses }, null, 2), 'utf8');
-}
-
-function normalizeLicenseCode(code) {
-  return String(code || '').trim().toUpperCase();
-}
-
-function isLicenseFormat(code) {
-  return /^[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{4}$/.test(code);
-}
-
 function sendUpdateStatus(message) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('update:status', message);
   }
 }
 
-function setupAutoUpdater() {
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = false;
+function fetchUpdateManifest() {
+  return new Promise((resolve, reject) => {
+    https.get(UPDATE_MANIFEST_URL, (response) => {
+      if (response.statusCode !== 200) {
+        response.resume();
+        reject(new Error(`Manifest trả về HTTP ${response.statusCode}`));
+        return;
+      }
 
-  autoUpdater.on('checking-for-update', () => {
-    sendUpdateStatus('Đang kiểm tra phiên bản mới...');
+      let body = '';
+      response.setEncoding('utf8');
+      response.on('data', (chunk) => { body += chunk; });
+      response.on('end', () => {
+        try {
+          const manifest = JSON.parse(body);
+          if (!manifest.version || !manifest.url) {
+            throw new Error('Manifest thiếu version hoặc url');
+          }
+          resolve(manifest);
+        } catch (error) {
+          reject(new Error(`Manifest không hợp lệ: ${error.message}`));
+        }
+      });
+    }).on('error', reject);
   });
+}
 
-  autoUpdater.on('update-available', (info) => {
-    sendUpdateStatus(`Có phiên bản mới ${info.version}. Đang tải về...`);
-  });
+function parseVersion(version) {
+  const match = String(version || '').match(/^v?(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?$/);
+  return match ? match.slice(1, 4).map(Number) : null;
+}
 
-  autoUpdater.on('update-not-available', () => {
-    sendUpdateStatus('Bạn đang dùng phiên bản mới nhất.');
-  });
+function isNewerVersion(candidate, current) {
+  const next = parseVersion(candidate);
+  const installed = parseVersion(current);
+  if (!next || !installed) {
+    throw new Error('Version trong manifest không hợp lệ');
+  }
 
-  autoUpdater.on('download-progress', (progress) => {
-    sendUpdateStatus(`Đang tải update: ${Math.round(progress.percent)}%`);
-  });
+  for (let index = 0; index < next.length; index += 1) {
+    if (next[index] !== installed[index]) return next[index] > installed[index];
+  }
+  return false;
+}
 
-  autoUpdater.on('update-downloaded', async (info) => {
-    sendUpdateStatus(`Đã tải xong phiên bản ${info.version}.`);
-    const result = await dialog.showMessageBox(mainWindow, {
-      type: 'question',
-      buttons: ['Khởi động lại để cập nhật', 'Để sau'],
-      defaultId: 0,
-      cancelId: 1,
-      title: 'Cập nhật phiên bản mới',
-      message: `Đã tải xong phiên bản ${info.version}. Khởi động lại app để cập nhật ngay?`
+function downloadInstaller(url, version, redirectCount = 0) {
+  const installerPath = path.join(app.getPath('temp'), `inventory-compare-update-${version}.exe`);
+  return new Promise((resolve, reject) => {
+    const request = https.get(url, (response) => {
+      if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+        response.resume();
+        if (redirectCount >= 5) {
+          reject(new Error('Installer chuyển hướng quá nhiều lần'));
+          return;
+        }
+        downloadInstaller(new URL(response.headers.location, url).toString(), version, redirectCount + 1)
+          .then(resolve)
+          .catch(reject);
+        return;
+      }
+
+      if (response.statusCode !== 200) {
+        response.resume();
+        reject(new Error(`Installer trả về HTTP ${response.statusCode}`));
+        return;
+      }
+
+      const totalBytes = Number(response.headers['content-length']) || 0;
+      let downloadedBytes = 0;
+      const output = fs.createWriteStream(installerPath);
+      response.on('data', (chunk) => {
+        downloadedBytes += chunk.length;
+        const percent = totalBytes ? Math.round((downloadedBytes / totalBytes) * 100) : 0;
+        sendUpdateStatus(`Đang tải update: ${percent}%`);
+      });
+      response.pipe(output);
+      output.on('finish', () => output.close(() => resolve(installerPath)));
+      output.on('error', (error) => {
+        fs.rm(installerPath, { force: true }, () => reject(error));
+      });
     });
-
-    if (result.response === 0) {
-      autoUpdater.quitAndInstall();
-    }
+    request.on('error', reject);
   });
+}
 
-  autoUpdater.on('error', (error) => {
-    sendUpdateStatus(`Lỗi update: ${error.message}`);
+function installUpdate(installerPath) {
+  const installer = spawn(installerPath, ['/S'], {
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true
   });
+  installer.unref();
+  app.quit();
 }
 
 app.whenReady().then(() => {
   createWindow();
-  setupAutoUpdater();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

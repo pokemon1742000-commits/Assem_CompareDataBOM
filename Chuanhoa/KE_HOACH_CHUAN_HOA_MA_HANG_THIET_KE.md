@@ -13,7 +13,6 @@ Xây dựng phần mềm Electron version `2.0.0` để chuẩn hóa mã hàng t
 - Hiển thị dữ liệu theo các tab: **Bảng thống kê**, **Dữ Liệu Mã**, **Dữ Liệu Thiết Kế**, **So Sánh**, **Mã Mới**.
 - Xuất Excel theo mẫu **Đề Nghị Mua Hàng**, gồm cả mã giống nhau và mã mới.
 - Kiểm tra update trên bản exe đã build.
-- License hiện ở trạng thái vĩnh viễn, không còn giới hạn trial.
 
 ## Nguồn dữ liệu
 

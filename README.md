@@ -144,7 +144,7 @@ Bấm `Clear dữ liệu` để xóa:
 
 ## Update phiên bản mới
 
-Nút `Update` kiểm tra bản mới trên GitHub Releases của repo:
+Nút `Update` đọc manifest `update.json` trên nhánh `main` của repo:
 
 ```text
 https://github.com/pokemon1742000-commits/Assem_CompareDataBOM
@@ -153,19 +153,11 @@ https://github.com/pokemon1742000-commits/Assem_CompareDataBOM
 Để app tự update hoạt động đúng:
 
 1. Build bản mới với version cao hơn trong `package.json`.
-2. Publish file build lên GitHub Releases.
-3. Release cần có file `.exe`, `.blockmap` và `latest.yml` do `electron-builder` tạo trong thư mục `release`.
-4. Người dùng bấm `Update`; nếu có bản mới, app sẽ tải về và hỏi khởi động lại để cài.
+2. Chạy `npm run release:auto -- 3.0.7 "Release v3.0.7"` để tạo release và cập nhật `update.json`.
+3. Release cần có file installer `.exe`, `.blockmap` và `latest.yml` do `electron-builder` tạo trong thư mục `release`.
+4. Người dùng bấm `Update`; nếu có bản mới, app tự tải installer, cài đặt bằng chế độ im lặng và khởi động lại.
 
 Lưu ý: nút `Update` chỉ hoạt động trên bản đã build `.exe`, không hoạt động khi chạy bằng `npm start`.
-
-## Trial và License
-
-- Khi chưa nhập license, phần mềm hiển thị `Trial` và cho dùng thử 7 ngày.
-- Bộ đếm thời gian trial nằm dưới nút `Update` và `Thông tin`.
-- Khi hết hạn trial, phần mềm sẽ khóa thao tác và chỉ cho nhập license hoặc tắt phần mềm.
-- Khi nhập đúng license, phần mềm chuyển sang bản vĩnh viễn và hiển thị version hiện tại, ví dụ `v3.0.0`.
-- License hợp lệ có dạng `XXX-XXX-XXX-XXXX`.
 
 ## Cấu trúc file chính
 

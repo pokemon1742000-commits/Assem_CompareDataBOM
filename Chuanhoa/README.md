@@ -92,11 +92,10 @@ Nếu vẫn còn mã trong bảng **Cần xác nhận**, app sẽ hiện popup: 
 - Chọn **Tiếp tục**: vẫn xuất file Excel.
 - Chọn **Hủy bỏ**: hủy xuất file.
 
-## Update và license
+## Update
 
 - Nút **Update** kiểm tra bản phát hành mới qua `electron-updater`; chức năng này chỉ chạy trên bản đã build exe.
 - Nút **Thông tin** mở trang GitHub phát hành.
-- Phần license hiện trả về trạng thái đã kích hoạt vĩnh viễn, không chặn sử dụng bằng trial.
 
 ## Chạy phát triển
 

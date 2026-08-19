@@ -1,4 +1,5 @@
 const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
 const packageJson = require('../package.json');
 
 const [requestedVersion, requestedMessage] = process.argv.slice(2);
@@ -62,6 +63,10 @@ if (packageJson.version !== version) {
 } else {
   console.log(`Version ${version} da duoc cap nhat, bo qua buoc npm version.`);
 }
+fs.writeFileSync('update.json', `${JSON.stringify({
+  version,
+  url: `https://github.com/${repository}/releases/download/${tag}/Inventory-Compare-Setup-v${version}-x64.exe`
+}, null, 2)}\n`, 'utf8');
 const githubToken = getGithubToken();
 run('npm', ['run', 'build:win', '--', '--publish', 'never']);
 run('git', ['add', '-A']);
@@ -78,7 +83,8 @@ run('git', ['push', 'origin', 'HEAD']);
 const releaseAssets = [
   `release/Inventory-Compare-Setup-v${version}-x64.exe`,
   `release/Inventory-Compare-Setup-v${version}-x64.exe.blockmap`,
-  'release/latest.yml'
+  'release/latest.yml',
+  'update.json'
 ];
 run('gh', [
   'release', 'create', tag, ...releaseAssets,

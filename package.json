@@ -1,6 +1,6 @@
 {
   "name": "inventory-compare-app",
-  "version": "3.0.6",
+  "version": "3.0.7",
   "description": "Phan mem so sanh du lieu kho va du lieu thiet ke tu Excel",
   "main": "main.js",
   "scripts": {
